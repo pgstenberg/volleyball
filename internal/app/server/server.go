@@ -6,10 +6,14 @@ import (
 	"github.com/pgstenberg/volleyball/internal/pkg/networking"
 	"log"
 	"net/http"
+	"time"
 )
 
 type GameServer struct {
 	Bind string
+
+	tick int
+	tickRate time.Duration
 }
 
 func (s *GameServer) Start(){
@@ -20,23 +24,33 @@ func (s *GameServer) Start(){
 
 	addr := flag.String("addr", s.Bind, "http service address")
 
-	hub := networking.NewHub()
+
+	gw := NewGameWorld(2)
+	hub := networking.NewHub(gw.NetworkOutputChannel)
 
 	go hub.Start()
-
-
+	go gw.startStateLoop()
 
 	flag.Parse()
 	log.SetFlags(0)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		ws(hub, &upgrader, w, r)
+		ws(gw, hub, &upgrader, w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Printf("Starting server using %s.", s.Bind)
+
+
+	gw.Start()
+
+	err := http.ListenAndServe(*addr, nil)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
 
-func ws(hub *networking.Hub, upgrader *websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
+func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -46,6 +60,6 @@ func ws(hub *networking.Hub, upgrader *websocket.Upgrader, w http.ResponseWriter
 	client := &networking.Client{Hub: hub, Conn: conn, Send: make(chan []byte, 256)}
 	client.Hub.Register <- client
 
-	go client.Read()
+	go client.Read(world.NetworkInputChannel)
 	go client.Write()
 }

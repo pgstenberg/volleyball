@@ -1,0 +1,169 @@
+<html>
+
+<head>
+
+  <style>
+  canvas {
+      border: 3px solid #333;
+  }
+  </style>
+
+   <script type = "text/javascript">
+
+   ws_open = false;
+
+
+         if ("WebSocket" in window) {
+
+            // Let us open a web socket
+            var ws = new WebSocket("ws://localhost:8080/");
+
+            ws.onopen = function() {
+              ws_open = true;
+            };
+
+            ws.onmessage = function (evt) {
+               var received_msg = evt.data;
+               x = parseInt(received_msg);
+
+            };
+
+            ws.onclose = function() {
+              ws_open = false;
+            };
+         } else {
+
+            // The browser doesn't support WebSocket
+            alert("WebSocket NOT supported by your Browser!");
+         }
+   </script>
+
+</head>
+
+<body>
+
+  <canvas id='tutorial' width='300' height='300'></canvas>
+
+<script>
+
+var canvas = document.getElementById('tutorial'),
+    ctx    = canvas.getContext('2d'),
+    invalid = true,   // component requires redrawing ?
+    cache   = null;   // cached off-screen canvas
+
+    function renderToCanvas(width, height, render, canvas) {
+      canvas = canvas || createCanvas(width, height, canvas);
+      render(canvas.getContext('2d'));
+      return canvas;
+    }
+
+    function createCanvas(width, height) {
+      var canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
+    }
+
+var KEY = {
+    BACKSPACE: 8,
+    TAB:       9,
+    RETURN:   13,
+    ESC:      27,
+    SPACE:    32,
+    PAGEUP:   33,
+    PAGEDOWN: 34,
+    END:      35,
+    HOME:     36,
+    LEFT:     37,
+    UP:       38,
+    RIGHT:    39,
+    DOWN:     40,
+    INSERT:   45,
+    DELETE:   46,
+    ZERO:     48, ONE: 49, TWO: 50, THREE: 51, FOUR: 52, FIVE: 53, SIX: 54, SEVEN: 55, EIGHT: 56, NINE: 57,
+    A:        65, B: 66, C: 67, D: 68, E: 69, F: 70, G: 71, H: 72, I: 73, J: 74, K: 75, L: 76, M: 77, N: 78, O: 79, P: 80, Q: 81, R: 82, S: 83, T: 84, U: 85, V: 86, W: 87, X: 88, Y: 89, Z: 90,
+    TILDA:    192
+  };
+
+var x = 0;
+
+var player = {
+  input: { left: false, right: false, jump: false }
+}
+
+document.addEventListener('keydown', function(ev) { return onkey(ev, ev.keyCode, true);  }, false);
+document.addEventListener('keyup',   function(ev) { return onkey(ev, ev.keyCode, false); }, false);
+
+function onkey(ev, key, pressed) {
+  switch(key) {
+    case KEY.LEFT:  player.input.left  = pressed; ev.preventDefault(); break;
+    case KEY.RIGHT: player.input.right = pressed; ev.preventDefault(); break;
+    case KEY.SPACE: player.input.jump  = pressed; ev.preventDefault(); break;
+  }
+}
+
+
+function timestamp() {
+  return window.performance && window.performance.now ? window.performance.now() : new Date().getTime();
+}
+
+function update(dt){
+
+
+
+  if(ws_open){
+    if(player.input.left){
+      x -= Math.round(120 * dt);
+      invalid = true;
+      ws.send('1');
+    }else if(player.input.right){
+      x += Math.round(120 * dt);
+      invalid = true;
+      ws.send('2');
+    }
+    console.log("DELTA:" + dt + ", X: " + x);
+  }
+
+}
+function render(ctx){
+  if (invalid) {
+
+    cache = renderToCanvas(600, 300, renderForReal, cache);
+    invalid = false;
+  }
+  ctx.drawImage(cache, x, 0);
+}
+
+function renderForReal(ctx) {
+  ctx.fillStyle   = '#FF0000';
+  ctx.strokeStyle = '#00FF00';
+  ctx.clearRect(0, 0, 600, 300);
+  ctx.beginPath();
+  ctx.fillRect(x, 0, 25, 25);
+  ctx.strokeRect(x, 0, 25, 25);
+}
+
+var now,
+    dt   = 0,
+    last = timestamp(),
+    step = 1/60;
+
+function frame() {
+  now = timestamp();
+  dt = dt + Math.min(1, (now - last) / 1000);
+  while(dt > step) {
+    dt = dt - step;
+    update(step);
+  }
+  renderForReal(ctx);
+  last = now;
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+
+</script>
+
+</body>
+
+</html>

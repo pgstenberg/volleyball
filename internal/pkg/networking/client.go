@@ -31,7 +31,7 @@ type Client struct {
 	Conn *websocket.Conn
 }
 
-func (c *Client) Read() {
+func (c *Client) Read(ch chan <- []byte) {
 	defer func() {
 		c.Hub.unregister <- c
 		c.Conn.Close()
@@ -47,10 +47,7 @@ func (c *Client) Read() {
 			}
 			break
 		}
-
-		log.Printf("Received Message: %s", message)
-
-		c.Hub.broadcast <- message
+		ch <- message
 	}
 }
 
