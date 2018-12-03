@@ -23,9 +23,13 @@
             };
 
             ws.onmessage = function (evt) {
-               var received_msg = evt.data;
-               x = parseInt(received_msg);
+               var d = JSON.parse(evt.data);
 
+               if(inputBuffer[d.LastSequenceNumber[0]] !== d.Players[0].X){
+                 x = d.Players[0].X;
+                 console.log("NOT EQUALS!");
+                 console.log(d);
+               }
             };
 
             ws.onclose = function() {
@@ -45,6 +49,10 @@
   <canvas id='tutorial' width='300' height='300'></canvas>
 
 <script>
+
+var seqNumber = 0;
+
+var inputBuffer = [];
 
 var canvas = document.getElementById('tutorial'),
     ctx    = canvas.getContext('2d'),
@@ -115,13 +123,16 @@ function update(dt){
     if(player.input.left){
       x -= Math.round(120 * dt);
       invalid = true;
-      ws.send('1');
+      inputBuffer[seqNumber] = x
+      ws.send(seqNumber + ';01');
+      seqNumber++;
     }else if(player.input.right){
       x += Math.round(120 * dt);
       invalid = true;
-      ws.send('2');
+      inputBuffer[seqNumber] = x
+      ws.send(seqNumber + ';02');
+      seqNumber++;
     }
-    console.log("DELTA:" + dt + ", X: " + x);
   }
 
 }

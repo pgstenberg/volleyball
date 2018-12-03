@@ -1,12 +1,13 @@
 package server
 
 type Player struct {
-	Id int
+	Id uint8
 	X int
 	Y int
 }
 
 type PlayerInput struct {
-	Id int
-	Value int
+	Id uint8
+	SequenceNumber uint32
+	Value uint8
 }

@@ -25,7 +25,7 @@ func (s *GameServer) Start(){
 	addr := flag.String("addr", s.Bind, "http service address")
 
 
-	gw := NewGameWorld(2)
+	gw := NewGameWorld(20)
 	hub := networking.NewHub(gw.NetworkOutputChannel)
 
 	go hub.Start()
