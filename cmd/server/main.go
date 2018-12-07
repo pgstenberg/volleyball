@@ -5,6 +5,6 @@ import (
 )
 
 func main(){
-	s := server.GameServer{Bind:"localhost:8080"}
+	s := server.GameServer{Bind:"0.0.0.0:8080"}
 	s.Start()
 }

@@ -16,7 +16,7 @@
          if ("WebSocket" in window) {
 
             // Let us open a web socket
-            var ws = new WebSocket("ws://localhost:8080/");
+            var ws = new WebSocket("ws://192.168.1.103:8080/");
 
             ws.onopen = function() {
               ws_open = true;
@@ -24,11 +24,10 @@
 
             ws.onmessage = function (evt) {
                var d = JSON.parse(evt.data);
-
                if(inputBuffer[d.LastSequenceNumber[0]] !== d.Players[0].X){
-                 x = d.Players[0].X;
-                 console.log("NOT EQUALS!");
-                 console.log(d);
+                 x_to = d.Players[0].X;
+               }else{
+                 x_to = x;
                }
             };
 
@@ -94,6 +93,7 @@ var KEY = {
   };
 
 var x = 0;
+var x_to = 0;
 
 var player = {
   input: { left: false, right: false, jump: false }
@@ -120,18 +120,28 @@ function update(dt){
 
 
   if(ws_open){
-    if(player.input.left){
+
+    if(x_to < x){
       x -= Math.round(120 * dt);
-      invalid = true;
-      inputBuffer[seqNumber] = x
-      ws.send(seqNumber + ';01');
-      seqNumber++;
-    }else if(player.input.right){
+    }else if(x_to > x){
       x += Math.round(120 * dt);
-      invalid = true;
-      inputBuffer[seqNumber] = x
-      ws.send(seqNumber + ';02');
-      seqNumber++;
+    }else{
+
+      if(player.input.left){
+        x -= Math.round(120 * dt);
+        x_to = x;
+        invalid = true;
+        inputBuffer[seqNumber] = x
+        ws.send(seqNumber + ';01');
+        seqNumber++;
+      }else if(player.input.right){
+        x += Math.round(120 * dt);
+        x_to = x;
+        invalid = true;
+        inputBuffer[seqNumber] = x
+        ws.send(seqNumber + ';02');
+        seqNumber++;
+      }
     }
   }
 
