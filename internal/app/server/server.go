@@ -2,28 +2,29 @@ package server
 
 import (
 	"flag"
-	"github.com/gorilla/websocket"
-	"github.com/pgstenberg/volleyball/internal/pkg/networking"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/pgstenberg/volleyball/internal/pkg/networking"
+	uuid "github.com/satori/go.uuid"
 )
 
 type GameServer struct {
 	Bind string
 
-	tick int
+	tick     int
 	tickRate time.Duration
 }
 
-func (s *GameServer) Start(){
+func (s *GameServer) Start() {
 
 	upgrader := websocket.Upgrader{}
 
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
 	addr := flag.String("addr", s.Bind, "http service address")
-
 
 	gw := NewGameWorld(20)
 	hub := networking.NewHub(gw.NetworkOutputChannel)
@@ -38,7 +39,6 @@ func (s *GameServer) Start(){
 	})
 
 	log.Printf("Starting server using %s.", s.Bind)
-
 
 	gw.Start()
 
@@ -57,7 +57,13 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		log.Println(err)
 		return
 	}
-	client := &networking.Client{Hub: hub, Conn: conn, Send: make(chan []byte, 256)}
+	// Create new client
+	client := &networking.Client{
+		Hub:  hub,
+		Conn: conn,
+		Send: make(chan []byte, 256),
+		ID:   uuid.Must(uuid.NewV4())}
+
 	client.Hub.Register <- client
 
 	go client.Read(world.NetworkInputChannel)

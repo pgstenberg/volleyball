@@ -30,11 +30,15 @@ func (h *Hub) Start() {
 	for {
 		select {
 		case client := <-h.Register:
-			log.Printf("New Client %s connected.", client.Conn.LocalAddr())
+
+			log.Printf("New Client %s connected from %s.",
+				client.ID,
+				client.Conn.LocalAddr())
+
 			h.clients[client] = true
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
-				log.Printf("Client %s disconnected.", client.Conn.LocalAddr())
+				log.Printf("Client %s disconnected.", client.ID)
 				delete(h.clients, client)
 				close(client.Send)
 			}

@@ -1,9 +1,11 @@
 package networking
 
 import (
-	"github.com/gorilla/websocket"
 	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -21,7 +23,6 @@ const (
 )
 
 type Client struct {
-
 	Hub *Hub
 
 	// Buffered channel of outbound messages.
@@ -29,9 +30,12 @@ type Client struct {
 
 	// The websocket connection.
 	Conn *websocket.Conn
+
+	ID uuid.UUID
 }
 
-func (c *Client) Read(ch chan <- []byte) {
+func (c *Client) Read(ch chan<- []byte) {
+
 	defer func() {
 		c.Hub.unregister <- c
 		c.Conn.Close()
@@ -47,7 +51,8 @@ func (c *Client) Read(ch chan <- []byte) {
 			}
 			break
 		}
-		ch <- message
+
+		ch <- append(message, c.ID.Bytes()...)
 	}
 }
 

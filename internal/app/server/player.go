@@ -1,13 +1,28 @@
 package server
 
-type Player struct {
-	Id uint8
-	X int
-	Y int
+type player struct {
+	pos *vector
+	vel *vector
+	acc *vector
 }
 
-type PlayerInput struct {
-	Id uint8
-	SequenceNumber uint32
-	Value uint8
+type playerInput struct {
+	sequenceNumber uint32
+	value          uint8
+}
+
+func (p player) proccessInput(value uint8, delta float64) {
+
+	switch value {
+	case 1:
+		p.acc.set(-40, 0)
+	case 2:
+		p.acc.set(40, 0)
+	}
+
+	p.acc.mul(delta)
+	p.vel.add(p.acc)
+	p.acc.mul(delta)
+
+	p.pos.add(p.vel)
 }

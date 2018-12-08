@@ -3,22 +3,23 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 type GameWorld struct {
-	onUpdate func(*GameWorld, float64)
-	ticker *time.Ticker
-	state chan GameWorldState
-	NetworkInputChannel chan []byte
+	onUpdate             func(*GameWorld, float64)
+	ticker               *time.Ticker
+	state                chan GameWorldState
+	NetworkInputChannel  chan []byte
 	NetworkOutputChannel chan []byte
-	mux sync.Mutex
-	inputBuffer []PlayerInput
-	Snapshot Snapshot
+	mux                  sync.Mutex
+	inputBuffer          map[uuid.UUID][]playerInput
+	snapshot             snapshot
 }
 
 type GameWorldState int
@@ -28,50 +29,28 @@ const (
 	Started
 )
 
-type Snapshot struct {
-	Players[] Player
-	LastSequenceNumber[] uint32
-}
-
-func copySnapshot(snapshot *Snapshot) *Snapshot{
-	newSnapshot := Snapshot{
-		Players: make([]Player, len(snapshot.Players)),
-	}
-	copy(newSnapshot.Players, snapshot.Players)
-	return &newSnapshot
-}
-
-func diffSnapshot(snapshot0 *Snapshot, snapshot *Snapshot) bool {
-	for index, player := range snapshot.Players {
-		if player.X != snapshot0.Players[index].X || player.Y != snapshot0.Players[index].Y{
-			return true
-		}
-	}
-	return false
-}
-
-func handlePlayerInputs(world *GameWorld, delta float64){
+func worldUpdate(world *GameWorld, delta float64) {
 	world.mux.Lock()
 
-	snapshot0 := copySnapshot(&world.Snapshot)
+	snapshot0 := copySnapshot(&world.snapshot)
 
-	for len(world.inputBuffer) > 0 {
-		input := world.inputBuffer[0]
-		dx := int(math.Round(float64(40) * delta))
-		switch input.Value {
-			case 1:
-				world.Snapshot.Players[input.Id].X -= dx
-			case 2:
-				world.Snapshot.Players[input.Id].X += dx
+	for id, playerInput := range world.inputBuffer {
+		for len(playerInput) > 0 {
+			input := world.inputBuffer[id][0]
+
+			world.snapshot.players[id].proccessInput(input.value, delta)
+
+			if world.snapshot.lastSequenceNumber[id] < input.sequenceNumber {
+				world.snapshot.lastSequenceNumber[id] = input.sequenceNumber
+			}
+			world.inputBuffer[id] = world.inputBuffer[id][1:]
 		}
-		if world.Snapshot.LastSequenceNumber[input.Id] < input.SequenceNumber {
-			world.Snapshot.LastSequenceNumber[input.Id] = input.SequenceNumber
-		}
-		world.inputBuffer = world.inputBuffer[1:]
 	}
 
-	if diffSnapshot(snapshot0, &world.Snapshot) {
-		b, err := json.Marshal(world.Snapshot)
+	dSnapshot := diffSnapshot(snapshot0, &world.snapshot)
+
+	if len(dSnapshot.players) > 0 {
+		b, err := json.Marshal(dSnapshot)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -82,40 +61,35 @@ func handlePlayerInputs(world *GameWorld, delta float64){
 	world.mux.Unlock()
 }
 
-
 func NewGameWorld(tickRate time.Duration) *GameWorld {
 	world := GameWorld{
-		onUpdate: handlePlayerInputs,
-		ticker: time.NewTicker(time.Second / tickRate),
-		state: make(chan GameWorldState),
-		NetworkInputChannel: make(chan []byte),
+		onUpdate:             worldUpdate,
+		ticker:               time.NewTicker(time.Second / tickRate),
+		state:                make(chan GameWorldState),
+		NetworkInputChannel:  make(chan []byte),
 		NetworkOutputChannel: make(chan []byte),
-		Snapshot: Snapshot{
-			Players: []Player{
-				{Id: 0, X: 0, Y:0 },
-				{Id: 1, X: 0, Y:0 },
-			},
-			LastSequenceNumber: []uint32{
-				0,
-				0,
-			},
+		snapshot: snapshot{
+			players:            make(map[uuid.UUID]player),
+			lastSequenceNumber: make(map[uuid.UUID]uint32),
 		},
 	}
 	return &world
 }
 
-func (world *GameWorld) Start(){
+func (world *GameWorld) Start() {
 	world.state <- Started
 }
-func (world *GameWorld) Stop(){
+func (world *GameWorld) Stop() {
 	world.state <- Stopped
 }
 
-
-func (world *GameWorld) startNetworkingInoutLoop(){
+func (world *GameWorld) startNetworkLoop() {
 	for data := range world.NetworkInputChannel {
 
-		s := strings.Split(string(data), ";")
+		id := data[0:16]
+		payload := data[16:]
+
+		s := strings.Split(string(payload), ";")
 
 		sequenceNumber, err := strconv.Atoi(s[0])
 
@@ -123,60 +97,53 @@ func (world *GameWorld) startNetworkingInoutLoop(){
 			continue
 		}
 
-		id, err := strconv.Atoi(string(s[1][0:1]))
+		value, err := strconv.Atoi(string(s[1][1:]))
 
 		if err != nil {
 			continue
 		}
 
-		value, err := strconv.Atoi(string(s[1][1:2]))
-
-		if err != nil {
-			continue
-		}
-
-		playerInput := PlayerInput{
-			SequenceNumber: uint32(sequenceNumber),
-			Id: uint8(id),
-			Value: uint8(value),
+		playerInput := playerInput{
+			sequenceNumber: uint8(id),
+			value:          uint8(value),
 		}
 
 		world.mux.Lock()
-		world.inputBuffer = append(world.inputBuffer, playerInput)
+		append(world.inputBuffer[id], playerInput)
 		world.mux.Unlock()
 	}
 }
 
-func (world *GameWorld) startStateLoop(){
+func (world *GameWorld) startStateLoop() {
 	for {
 		select {
-			case state := <- world.state:
-				switch state {
-					case Stopped:
-						world.ticker.Stop()
-						close(world.NetworkInputChannel)
-						close(world.NetworkOutputChannel)
-					case Started:
-						go world.startGameLoop()
-						go world.startNetworkingInoutLoop()
-				}
+		case state := <-world.state:
+			switch state {
+			case Stopped:
+				world.ticker.Stop()
+				close(world.NetworkInputChannel)
+				close(world.NetworkOutputChannel)
+			case Started:
+				go world.startGameLoop()
+				go world.startNetworkLoop()
+			}
 		}
 	}
 }
 
-func (world *GameWorld) startGameLoop(){
+func (world *GameWorld) startGameLoop() {
 
 	t0 := time.Now().UnixNano()
 
 	for {
 		select {
-			case <- world.ticker.C:
-				t := time.Now().UnixNano()
-				// DT in seconds
-				delta := float64(t-t0) / 1000000000
-				t0 = t
+		case <-world.ticker.C:
+			t := time.Now().UnixNano()
+			// DT in seconds
+			delta := float64(t-t0) / 1000000000
+			t0 = t
 
-				world.onUpdate(world, delta)
+			world.onUpdate(world, delta)
 		}
 	}
 

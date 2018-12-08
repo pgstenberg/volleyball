@@ -16,7 +16,7 @@
          if ("WebSocket" in window) {
 
             // Let us open a web socket
-            var ws = new WebSocket("ws://192.168.1.103:8080/");
+            var ws = new WebSocket("ws://127.0.0.1:8080/");
 
             ws.onopen = function() {
               ws_open = true;
