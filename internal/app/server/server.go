@@ -40,7 +40,7 @@ func (s *GameServer) Start() {
 
 	log.Printf("Starting server using %s.", s.Bind)
 
-	gw.Start()
+	gw.start()
 
 	err := http.ListenAndServe(*addr, nil)
 

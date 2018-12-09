@@ -52,7 +52,7 @@ func (c *Client) Read(ch chan<- []byte) {
 			break
 		}
 
-		ch <- append(message, c.ID.Bytes()...)
+		ch <- append(c.ID.Bytes(), message...)
 	}
 }
 

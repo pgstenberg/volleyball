@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,44 +73,56 @@ func NewGameWorld(tickRate time.Duration) *GameWorld {
 			players:            make(map[uuid.UUID]player),
 			lastSequenceNumber: make(map[uuid.UUID]uint32),
 		},
+		inputBuffer: make(map[uuid.UUID][]playerInput),
 	}
 	return &world
 }
 
-func (world *GameWorld) Start() {
+func (world *GameWorld) start() {
 	world.state <- Started
 }
-func (world *GameWorld) Stop() {
+func (world *GameWorld) stop() {
 	world.state <- Stopped
 }
 
 func (world *GameWorld) startNetworkLoop() {
 	for data := range world.NetworkInputChannel {
 
-		id := data[0:16]
+		fmt.Printf("Network Input: %s\n", string(data))
+
+		id, err := uuid.FromBytes(data[0:16])
+		if err != nil {
+			log.Fatal(err)
+			continue
+		}
+
 		payload := data[16:]
 
 		s := strings.Split(string(payload), ";")
 
-		sequenceNumber, err := strconv.Atoi(s[0])
+		sequenceNumber, err := strconv.ParseUint(s[0], 10, 32)
 
 		if err != nil {
+			log.Fatal(err)
 			continue
 		}
 
-		value, err := strconv.Atoi(string(s[1][1:]))
+		value, err := strconv.ParseUint(s[1], 10, 8)
 
 		if err != nil {
+			log.Fatal(err)
 			continue
 		}
 
-		playerInput := playerInput{
-			sequenceNumber: uint8(id),
+		fmt.Printf("ID: %s, seqNum: %d, val: %d\n", id.String(), sequenceNumber, value)
+
+		pInput := playerInput{
+			sequenceNumber: uint32(sequenceNumber),
 			value:          uint8(value),
 		}
 
 		world.mux.Lock()
-		append(world.inputBuffer[id], playerInput)
+		world.inputBuffer[id] = append(world.inputBuffer[id], pInput)
 		world.mux.Unlock()
 	}
 }
