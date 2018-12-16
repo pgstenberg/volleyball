@@ -11,7 +11,7 @@ type playerInput struct {
 	value          uint8
 }
 
-func (p player) proccessInput(value uint8, delta float64) {
+func (p *player) proccessInput(value uint8, delta float64) {
 
 	switch value {
 	case 1:
@@ -25,4 +25,7 @@ func (p player) proccessInput(value uint8, delta float64) {
 	p.acc.mul(delta)
 
 	p.pos.add(p.vel)
+
+	///fmt.Printf("X: %d, Y: %d\n", p.pos.x, p.pos.y)
+
 }

@@ -37,14 +37,12 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	for id, playerInput := range world.inputBuffer {
 		for len(playerInput) > 0 {
-			input := world.inputBuffer[id][0]
-
+			input := playerInput[0]
 			world.snapshot.players[id].proccessInput(input.value, delta)
-
 			if world.snapshot.lastSequenceNumber[id] < input.sequenceNumber {
 				world.snapshot.lastSequenceNumber[id] = input.sequenceNumber
 			}
-			world.inputBuffer[id] = world.inputBuffer[id][1:]
+			playerInput = playerInput[1:]
 		}
 	}
 
@@ -56,6 +54,7 @@ func worldUpdate(world *GameWorld, delta float64) {
 			fmt.Println(err)
 			return
 		}
+		fmt.Println(string(b))
 		world.NetworkOutputChannel <- b
 	}
 
@@ -70,7 +69,7 @@ func NewGameWorld(tickRate time.Duration) *GameWorld {
 		NetworkInputChannel:  make(chan []byte),
 		NetworkOutputChannel: make(chan []byte),
 		snapshot: snapshot{
-			players:            make(map[uuid.UUID]player),
+			players:            make(map[uuid.UUID]*player),
 			lastSequenceNumber: make(map[uuid.UUID]uint32),
 		},
 		inputBuffer: make(map[uuid.UUID][]playerInput),
@@ -87,8 +86,6 @@ func (world *GameWorld) stop() {
 
 func (world *GameWorld) startNetworkLoop() {
 	for data := range world.NetworkInputChannel {
-
-		fmt.Printf("Network Input: %s\n", string(data))
 
 		id, err := uuid.FromBytes(data[0:16])
 		if err != nil {
@@ -113,8 +110,6 @@ func (world *GameWorld) startNetworkLoop() {
 			log.Fatal(err)
 			continue
 		}
-
-		fmt.Printf("ID: %s, seqNum: %d, val: %d\n", id.String(), sequenceNumber, value)
 
 		pInput := playerInput{
 			sequenceNumber: uint32(sequenceNumber),

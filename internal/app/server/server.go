@@ -64,6 +64,13 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		Send: make(chan []byte, 256),
 		ID:   uuid.Must(uuid.NewV4())}
 
+	world.snapshot.players[client.ID] = &player{
+		pos: &vector{x: 0, y: 0},
+		vel: &vector{x: 0, y: 0},
+		acc: &vector{x: 0, y: 0},
+	}
+	world.snapshot.lastSequenceNumber[client.ID] = 0
+
 	client.Hub.Register <- client
 
 	go client.Read(world.NetworkInputChannel)
