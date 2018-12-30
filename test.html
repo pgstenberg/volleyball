@@ -11,6 +11,7 @@
    <script type = "text/javascript">
 
    ws_open = false;
+  
 
 
          if ("WebSocket" in window) {
@@ -23,12 +24,30 @@
             };
 
             ws.onmessage = function (evt) {
-               var d = JSON.parse(evt.data);
-               if(inputBuffer[d.LastSequenceNumber[0]] !== d.Players[0].X){
-                 x_to = d.Players[0].X;
-               }else{
-                 x_to = x;
-               }
+              if (typeof playerID === 'undefined') {
+                playerID = evt.data;
+                console.log("New Player ID: " + playerID);
+                return;
+              }
+
+              d = JSON.parse(evt.data);
+
+              if(playerID in d['Players']){
+
+                console.log("X1: " + snapshot[d['Players'][playerID]['LastSequenceNumber']].x + " Y1: " + snapshot[d['Players'][playerID]['LastSequenceNumber']].y);
+                console.log("X2: " + d['Players'][playerID]['PosX'] + " Y2: " + d['Players'][playerID]['PosY']);
+                console.log("");
+
+
+                if((snapshot[d['Players'][playerID]['LastSequenceNumber']].x !== d['Players'][playerID]['PosX'])){
+                  //player.position.x = d['Players'][playerID]['PosX'];
+                }
+
+                if(snapshot[d['Players'][playerID]['LastSequenceNumber']].y !== d['Players'][playerID]['PosY']){
+                  //player.position.y = d['Players'][playerID]['PosY'];
+                }
+              }
+
             };
 
             ws.onclose = function() {
@@ -49,9 +68,28 @@
 
 <script>
 
-var seqNumber = 0;
 
-var inputBuffer = [];
+var player = {
+  input: { left: false, right: false, jump: false },
+  state: [false, false, false],
+  position: { x: 0, y: 0},
+  velocity: { x: 0, y: 0}
+}
+
+var seqNumber = 0;
+var playerID;
+
+var snapshot = [];
+
+var CLIENT_TICK_RATE = 60;
+var PLAYER_SPEED = 4 * CLIENT_TICK_RATE;
+var GRAVITY = 8 * CLIENT_TICK_RATE;
+var PLAYER_JUMP_SPEED = GRAVITY * 3;
+var MAX_JUMP_HIGHT = 150;
+
+var STATE_MOVING_LEFT = 0;
+var STATE_MOVING_RIGHT = 1;
+var STATE_JUMPING = 2;
 
 var canvas = document.getElementById('tutorial'),
     ctx    = canvas.getContext('2d'),
@@ -92,13 +130,6 @@ var KEY = {
     TILDA:    192
   };
 
-var x = 0;
-var x_to = 0;
-
-var player = {
-  input: { left: false, right: false, jump: false }
-}
-
 document.addEventListener('keydown', function(ev) { return onkey(ev, ev.keyCode, true);  }, false);
 document.addEventListener('keyup',   function(ev) { return onkey(ev, ev.keyCode, false); }, false);
 
@@ -119,30 +150,64 @@ function update(dt){
 
 
 
+
   if(ws_open){
 
-    if(x_to < x){
-      x -= Math.round(120 * dt);
-    }else if(x_to > x){
-      x += Math.round(120 * dt);
-    }else{
+      var _input = []
 
       if(player.input.left){
-        x -= Math.round(120 * dt);
-        x_to = x;
-        invalid = true;
-        inputBuffer[seqNumber] = x
-        ws.send(seqNumber + ';01');
-        seqNumber++;
+        player.state[STATE_MOVING_LEFT] = true;
+        _input.push("01");
       }else if(player.input.right){
-        x += Math.round(120 * dt);
-        x_to = x;
-        invalid = true;
-        inputBuffer[seqNumber] = x
-        ws.send(seqNumber + ';02');
+        player.state[STATE_MOVING_RIGHT] = true;
+        _input.push("02");
+      }
+
+      if(player.input.jump){
+        if(player.position.y === 0 && !player.state[STATE_JUMPING]){
+          player.state[STATE_JUMPING] = true;
+          _input.push("03");
+        }
+      }
+      
+
+      if(player.state[STATE_MOVING_LEFT]){
+        player.velocity.x = -PLAYER_SPEED;
+      }else if(player.state[STATE_MOVING_RIGHT]){
+        player.velocity.x = PLAYER_SPEED;
+      }
+
+      if(player.state[STATE_JUMPING]) {
+        player.velocity.y = PLAYER_JUMP_SPEED;
+      }
+
+      if(player.position.y > 0){
+        player.velocity.y -= GRAVITY;
+      }
+      
+      player.position.x += Math.round(player.velocity.x * dt);
+      player.position.y += Math.round(player.velocity.y * dt);
+
+      if(player.position.y < 0){
+        player.position.y = 0;
+        player.velocity.y = 0;
+        player.state[STATE_JUMPING] = false;
+      }else if(player.position.y > MAX_JUMP_HIGHT){
+        player.position.y = MAX_JUMP_HIGHT;
+        player.state[STATE_JUMPING] = false;
+      }
+
+      player.state[STATE_MOVING_LEFT] = false;
+      player.state[STATE_MOVING_RIGHT] = false;
+      player.velocity.x = 0;
+
+      if(_input.length !== 0){
+        snapshot[seqNumber] = player.position
+        ws.send(seqNumber + ";" + _input.join(";"));
         seqNumber++;
       }
-    }
+      
+
   }
 
 }
@@ -160,8 +225,8 @@ function renderForReal(ctx) {
   ctx.strokeStyle = '#00FF00';
   ctx.clearRect(0, 0, 600, 300);
   ctx.beginPath();
-  ctx.fillRect(x, 0, 25, 25);
-  ctx.strokeRect(x, 0, 25, 25);
+  ctx.fillRect(player.position.x, 300 - player.position.y - 25, 25, 25);
+  ctx.strokeRect(player.position.x, 300 - player.position.y - 25, 25, 25);
 }
 
 var now,

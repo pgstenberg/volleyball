@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -35,27 +34,30 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	snapshot0 := copySnapshot(&world.snapshot)
 
-	for id, playerInput := range world.inputBuffer {
-		for len(playerInput) > 0 {
-			input := playerInput[0]
-			world.snapshot.players[id].proccessInput(input.value, delta)
-			if world.snapshot.lastSequenceNumber[id] < input.sequenceNumber {
-				world.snapshot.lastSequenceNumber[id] = input.sequenceNumber
+	for id := range world.inputBuffer {
+		for len(world.inputBuffer[id]) > 0 {
+			input := world.inputBuffer[id][0]
+			world.snapshot.Players[id].proccessInput(input.value)
+			if world.snapshot.Players[id].LastSequenceNumber < input.sequenceNumber {
+				world.snapshot.Players[id].LastSequenceNumber = input.sequenceNumber
 			}
-			playerInput = playerInput[1:]
+			world.inputBuffer[id] = world.inputBuffer[id][1:]
 		}
+	}
+
+	for _, p := range world.snapshot.Players {
+		p.update(delta)
 	}
 
 	dSnapshot := diffSnapshot(snapshot0, &world.snapshot)
 
-	if len(dSnapshot.players) > 0 {
-		b, err := json.Marshal(dSnapshot)
+	if len(dSnapshot.Players) > 0 {
+		b, err := json.Marshal(&dSnapshot)
 		if err != nil {
-			fmt.Println(err)
-			return
+			log.Fatalf("Unable to marshal snapshot, err: %s", err)
+		} else {
+			world.NetworkOutputChannel <- b
 		}
-		fmt.Println(string(b))
-		world.NetworkOutputChannel <- b
 	}
 
 	world.mux.Unlock()
@@ -69,8 +71,7 @@ func NewGameWorld(tickRate time.Duration) *GameWorld {
 		NetworkInputChannel:  make(chan []byte),
 		NetworkOutputChannel: make(chan []byte),
 		snapshot: snapshot{
-			players:            make(map[uuid.UUID]*player),
-			lastSequenceNumber: make(map[uuid.UUID]uint32),
+			Players: make(map[uuid.UUID]*player),
 		},
 		inputBuffer: make(map[uuid.UUID][]playerInput),
 	}
@@ -104,20 +105,20 @@ func (world *GameWorld) startNetworkLoop() {
 			continue
 		}
 
-		value, err := strconv.ParseUint(s[1], 10, 8)
-
-		if err != nil {
-			log.Fatal(err)
-			continue
-		}
-
-		pInput := playerInput{
-			sequenceNumber: uint32(sequenceNumber),
-			value:          uint8(value),
-		}
-
 		world.mux.Lock()
-		world.inputBuffer[id] = append(world.inputBuffer[id], pInput)
+		for _, input := range s[1:] {
+			value, err := strconv.ParseUint(input, 10, 8)
+
+			if err != nil {
+				log.Fatal(err)
+				continue
+			}
+
+			world.inputBuffer[id] = append(world.inputBuffer[id], playerInput{
+				sequenceNumber: uint32(sequenceNumber),
+				value:          uint8(value),
+			})
+		}
 		world.mux.Unlock()
 	}
 }

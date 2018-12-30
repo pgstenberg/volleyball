@@ -18,6 +18,8 @@ type GameServer struct {
 	tickRate time.Duration
 }
 
+const ServerTickRate int = 20
+
 func (s *GameServer) Start() {
 
 	upgrader := websocket.Upgrader{}
@@ -26,7 +28,7 @@ func (s *GameServer) Start() {
 
 	addr := flag.String("addr", s.Bind, "http service address")
 
-	gw := NewGameWorld(20)
+	gw := NewGameWorld(time.Duration(ServerTickRate))
 	hub := networking.NewHub(gw.NetworkOutputChannel)
 
 	go hub.Start()
@@ -64,15 +66,20 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		Send: make(chan []byte, 256),
 		ID:   uuid.Must(uuid.NewV4())}
 
-	world.snapshot.players[client.ID] = &player{
-		pos: &vector{x: 0, y: 0},
-		vel: &vector{x: 0, y: 0},
-		acc: &vector{x: 0, y: 0},
+	world.snapshot.Players[client.ID] = &player{
+		PosX:               0,
+		PosY:               0,
+		velX:               0,
+		velY:               0,
+		LastSequenceNumber: 0,
+		state:              make([]bool, 3),
 	}
-	world.snapshot.lastSequenceNumber[client.ID] = 0
 
 	client.Hub.Register <- client
 
 	go client.Read(world.NetworkInputChannel)
 	go client.Write()
+
+	client.Send <- []byte(client.ID.String())
+
 }

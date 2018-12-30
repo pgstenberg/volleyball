@@ -5,26 +5,16 @@ import (
 )
 
 type snapshot struct {
-	players            map[uuid.UUID]*player
-	lastSequenceNumber map[uuid.UUID]uint32
+	Players map[uuid.UUID]*player
+	//LastSequenceNumber map[uuid.UUID]uint32
 }
 
 func copySnapshot(snapshot1 *snapshot) *snapshot {
 	newSnapshot := snapshot{
-		players:            make(map[uuid.UUID]*player, len(snapshot1.players)),
-		lastSequenceNumber: make(map[uuid.UUID]uint32, len(snapshot1.lastSequenceNumber)),
+		Players: make(map[uuid.UUID]*player, len(snapshot1.Players)),
 	}
-	for index, element := range snapshot1.players {
-
-		newSnapshot.players[index] = &player{
-			pos: &vector{x: element.pos.x, y: element.pos.y},
-			vel: &vector{x: element.vel.x, y: element.vel.y},
-			acc: &vector{x: element.acc.x, y: element.acc.y},
-		}
-	}
-	for index, element := range snapshot1.lastSequenceNumber {
-		v := element
-		newSnapshot.lastSequenceNumber[index] = v
+	for index, element := range snapshot1.Players {
+		newSnapshot.Players[index] = element.copy()
 	}
 	return &newSnapshot
 }
@@ -32,17 +22,12 @@ func copySnapshot(snapshot1 *snapshot) *snapshot {
 func diffSnapshot(snapshot0 *snapshot, snapshot1 *snapshot) *snapshot {
 
 	dSnapshot := snapshot{
-		players:            make(map[uuid.UUID]*player),
-		lastSequenceNumber: make(map[uuid.UUID]uint32),
+		Players: make(map[uuid.UUID]*player),
 	}
 
-	for id, p := range snapshot1.players {
-		if p.pos.x != snapshot0.players[id].pos.x || p.pos.y != snapshot0.players[id].pos.y {
-			dSnapshot.players[id] = &player{
-				pos: p.pos,
-				vel: p.vel,
-				acc: p.acc,
-			}
+	for id, p := range snapshot1.Players {
+		if p.PosX != snapshot0.Players[id].PosX || p.PosY != snapshot0.Players[id].PosY {
+			dSnapshot.Players[id] = p.copy()
 		}
 	}
 
