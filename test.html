@@ -34,9 +34,12 @@
 
               if(playerID in d['Players']){
 
+                /*
+                console.log("SEQ: " + d['Players'][playerID]['LastSequenceNumber']);
                 console.log("X1: " + snapshot[d['Players'][playerID]['LastSequenceNumber']].x + " Y1: " + snapshot[d['Players'][playerID]['LastSequenceNumber']].y);
                 console.log("X2: " + d['Players'][playerID]['PosX'] + " Y2: " + d['Players'][playerID]['PosY']);
                 console.log("");
+                */
 
 
                 if((snapshot[d['Players'][playerID]['LastSequenceNumber']].x !== d['Players'][playerID]['PosX'])){
@@ -80,12 +83,13 @@ var seqNumber = 0;
 var playerID;
 
 var snapshot = [];
+var jumpInputs = 0;
 
 var CLIENT_TICK_RATE = 60;
 var PLAYER_SPEED = 4 * CLIENT_TICK_RATE;
-var GRAVITY = 8 * CLIENT_TICK_RATE;
+var GRAVITY = 4 * CLIENT_TICK_RATE;
 var PLAYER_JUMP_SPEED = GRAVITY * 3;
-var MAX_JUMP_HIGHT = 150;
+var MAX_JUMP_INPUTS = 10;
 
 var STATE_MOVING_LEFT = 0;
 var STATE_MOVING_RIGHT = 1;
@@ -164,9 +168,15 @@ function update(dt){
       }
 
       if(player.input.jump){
-        if(player.position.y === 0 && !player.state[STATE_JUMPING]){
-          player.state[STATE_JUMPING] = true;
-          _input.push("03");
+          if(jumpInputs <= MAX_JUMP_INPUTS && player.velocity.y >= 0){
+            player.state[STATE_JUMPING] = true;
+            _input.push("03");
+            jumpInputs += 1;
+          }
+      }else{
+        if(player.position.y === 0 && jumpInputs > 0){
+          jumpInputs = 0;
+          _input.push("04");
         }
       }
       
@@ -191,19 +201,23 @@ function update(dt){
       if(player.position.y < 0){
         player.position.y = 0;
         player.velocity.y = 0;
-        player.state[STATE_JUMPING] = false;
-      }else if(player.position.y > MAX_JUMP_HIGHT){
-        player.position.y = MAX_JUMP_HIGHT;
-        player.state[STATE_JUMPING] = false;
+      }
+
+      if(player.position.y > 0){
+        console.log("INPUT " + jumpInputs);
+        console.log("Y: " + player.position.y);
+        console.log("");
       }
 
       player.state[STATE_MOVING_LEFT] = false;
       player.state[STATE_MOVING_RIGHT] = false;
+      player.state[STATE_JUMPING] = false;
       player.velocity.x = 0;
 
       if(_input.length !== 0){
         snapshot[seqNumber] = player.position
-        ws.send(seqNumber + ";" + _input.join(";"));
+        input_package = seqNumber + ";" + _input.join(";");
+        ws.send(input_package);
         seqNumber++;
       }
       

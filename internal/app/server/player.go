@@ -1,12 +1,16 @@
 package server
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type player struct {
 	PosX, PosY         int
 	velX, velY         float64
 	LastSequenceNumber uint32
 	state              []bool
+	jumpInputs         int
 }
 
 type playerInput struct {
@@ -19,7 +23,7 @@ const stateMovingRight int = 1
 const stateJumping int = 2
 
 const playerSpeed float64 = 4 * float64(ServerTickRate)
-const gravity float64 = 8 * float64(ServerTickRate)
+const gravity float64 = 4 * float64(ServerTickRate)
 const jumpSpeed = gravity * 3
 const maxJumpHight = 150
 
@@ -31,8 +35,15 @@ func (p *player) proccessInput(value uint8) {
 	case 2:
 		p.state[stateMovingRight] = true
 	case 3:
-		if p.PosY == 0 && !p.state[stateJumping] {
+		if p.jumpInputs <= 10 && p.velY >= 0 {
 			p.state[stateJumping] = true
+
+			p.jumpInputs++
+		}
+	case 4:
+		fmt.Printf("4! Y: %d", p.PosY)
+		if p.PosY == 0 && p.jumpInputs > 0 {
+			p.jumpInputs = 0
 		}
 	}
 
@@ -60,12 +71,13 @@ func (p *player) update(delta float64) {
 	if p.PosY < 0 {
 		p.PosY = 0
 		p.velY = 0
-		p.state[stateJumping] = false
-	} else if p.PosY > maxJumpHight {
-		p.PosY = maxJumpHight
-		p.state[stateJumping] = false
+
 	}
 
+	fmt.Printf("INPUT %d\n", p.jumpInputs)
+	fmt.Printf("Y: %d\n\n", p.PosY)
+
+	p.state[stateJumping] = false
 	p.state[stateMovingRight] = false
 	p.state[stateMovingLeft] = false
 	p.velX = 0
@@ -79,5 +91,6 @@ func (p *player) copy() *player {
 		velY:               p.velY,
 		LastSequenceNumber: p.LastSequenceNumber,
 		state:              p.state,
+		jumpInputs:         p.jumpInputs,
 	}
 }

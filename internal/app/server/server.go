@@ -73,6 +73,7 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		velY:               0,
 		LastSequenceNumber: 0,
 		state:              make([]bool, 3),
+		jumpInputs:         0,
 	}
 
 	client.Hub.Register <- client

@@ -38,15 +38,12 @@ func worldUpdate(world *GameWorld, delta float64) {
 		for len(world.inputBuffer[id]) > 0 {
 			input := world.inputBuffer[id][0]
 			world.snapshot.Players[id].proccessInput(input.value)
+			world.snapshot.Players[id].update(delta)
 			if world.snapshot.Players[id].LastSequenceNumber < input.sequenceNumber {
 				world.snapshot.Players[id].LastSequenceNumber = input.sequenceNumber
 			}
 			world.inputBuffer[id] = world.inputBuffer[id][1:]
 		}
-	}
-
-	for _, p := range world.snapshot.Players {
-		p.update(delta)
 	}
 
 	dSnapshot := diffSnapshot(snapshot0, &world.snapshot)
@@ -114,10 +111,12 @@ func (world *GameWorld) startNetworkLoop() {
 				continue
 			}
 
-			world.inputBuffer[id] = append(world.inputBuffer[id], playerInput{
+			pInput := playerInput{
 				sequenceNumber: uint32(sequenceNumber),
 				value:          uint8(value),
-			})
+			}
+
+			world.inputBuffer[id] = append(world.inputBuffer[id], pInput)
 		}
 		world.mux.Unlock()
 	}
