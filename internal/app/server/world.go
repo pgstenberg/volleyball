@@ -1,25 +1,24 @@
 package server
 
 import (
-	"encoding/json"
-	"log"
-	"strconv"
-	"strings"
+	"encoding/binary"
+	"fmt"
 	"sync"
 	"time"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 type GameWorld struct {
 	onUpdate             func(*GameWorld, float64)
 	ticker               *time.Ticker
+	tick                 uint16
 	state                chan GameWorldState
 	NetworkInputChannel  chan []byte
 	NetworkOutputChannel chan []byte
 	mux                  sync.Mutex
-	inputBuffer          map[uuid.UUID][]playerInput
-	snapshot             snapshot
+	// State based on server tick.
+	players map[uint8]map[uint8]*player
+	// Server tick and input buffer.
+	stateBuffer map[uint8]map[uint8]map[uint32][]bool
 }
 
 type GameWorldState int
@@ -29,33 +28,29 @@ const (
 	Started
 )
 
+const stateBufferSize = 100
+
 func worldUpdate(world *GameWorld, delta float64) {
 	world.mux.Lock()
 
-	snapshot0 := copySnapshot(&world.snapshot)
+	currTickIdx := uint8(world.tick % stateBufferSize)
+	nextTickIdx := uint8((world.tick + 1) % stateBufferSize)
 
-	for id := range world.inputBuffer {
-		for len(world.inputBuffer[id]) > 0 {
-			input := world.inputBuffer[id][0]
-			world.snapshot.Players[id].proccessInput(input.value)
-			world.snapshot.Players[id].update(delta)
-			if world.snapshot.Players[id].LastSequenceNumber < input.sequenceNumber {
-				world.snapshot.Players[id].LastSequenceNumber = input.sequenceNumber
-			}
-			world.inputBuffer[id] = world.inputBuffer[id][1:]
+	world.players[nextTickIdx] = make(map[uint8]*player)
+	world.stateBuffer[nextTickIdx] = make(map[uint8]map[uint32][]bool)
+
+	for id, p := range world.players[currTickIdx] {
+		fmt.Printf("UPDATE >>>>>> %d\n", world.tick)
+		for tid, i := range world.stateBuffer[currTickIdx][id] {
+			fmt.Printf("Seq: %d -> %s\n", tid, i)
+			p.process(world, id, i)
 		}
+		p.update(delta)
+		fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
+		world.players[nextTickIdx][id] = p.copy()
+		world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
 	}
-
-	dSnapshot := diffSnapshot(snapshot0, &world.snapshot)
-
-	if len(dSnapshot.Players) > 0 {
-		b, err := json.Marshal(&dSnapshot)
-		if err != nil {
-			log.Fatalf("Unable to marshal snapshot, err: %s", err)
-		} else {
-			world.NetworkOutputChannel <- b
-		}
-	}
+	world.tick++
 
 	world.mux.Unlock()
 }
@@ -64,13 +59,12 @@ func NewGameWorld(tickRate time.Duration) *GameWorld {
 	world := GameWorld{
 		onUpdate:             worldUpdate,
 		ticker:               time.NewTicker(time.Second / tickRate),
+		tick:                 1,
 		state:                make(chan GameWorldState),
 		NetworkInputChannel:  make(chan []byte),
 		NetworkOutputChannel: make(chan []byte),
-		snapshot: snapshot{
-			Players: make(map[uuid.UUID]*player),
-		},
-		inputBuffer: make(map[uuid.UUID][]playerInput),
+		players:              make(map[uint8]map[uint8]*player),
+		stateBuffer:          make(map[uint8]map[uint8]map[uint32][]bool),
 	}
 	return &world
 }
@@ -85,40 +79,60 @@ func (world *GameWorld) stop() {
 func (world *GameWorld) startNetworkLoop() {
 	for data := range world.NetworkInputChannel {
 
-		id, err := uuid.FromBytes(data[0:16])
-		if err != nil {
-			log.Fatal(err)
-			continue
-		}
-
-		payload := data[16:]
-
-		s := strings.Split(string(payload), ";")
-
-		sequenceNumber, err := strconv.ParseUint(s[0], 10, 32)
-
-		if err != nil {
-			log.Fatal(err)
-			continue
-		}
-
 		world.mux.Lock()
-		for _, input := range s[1:] {
-			value, err := strconv.ParseUint(input, 10, 8)
 
-			if err != nil {
-				log.Fatal(err)
-				continue
+		clientID := uint8(data[0])
+		packageType := uint8(data[1])
+
+		currTickIdx := uint8(world.tick % stateBufferSize)
+		prevTickIdx := uint8((world.tick - 1) % stateBufferSize)
+
+		switch packageType {
+		case 1:
+
+			seq := binary.LittleEndian.Uint32(data[5:9])
+
+			inputs := []bool{false, false, false}
+
+			for idx := 9; idx < len(data); idx++ {
+				id := uint8(data[idx])
+				inputs[id] = true
 			}
 
-			pInput := playerInput{
-				sequenceNumber: uint32(sequenceNumber),
-				value:          uint8(value),
-			}
+			//
+			// Input Buffer
+			//
+			/*
+				if nil == world.stateBuffer[currTickIdx] {
+					world.stateBuffer[currTickIdx] = make(map[uint8]map[uint32][]bool)
+				}
+				if nil == world.stateBuffer[currTickIdx][clientID] {
+					world.stateBuffer[currTickIdx][clientID] = make(map[uint32][]bool)
+				}
+			*/
+			// Update next server tick with inputs and last sequence number.
+			fmt.Printf("NETWORK >>>>>> %d\n", world.tick)
+			fmt.Printf("Seq: %d -> %s\n", seq, inputs)
+			fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
 
-			world.inputBuffer[id] = append(world.inputBuffer[id], pInput)
+			world.stateBuffer[currTickIdx][clientID][seq] = inputs
+
+			//
+			// Player State
+			//
+			if nil == world.players[currTickIdx] {
+				world.players[currTickIdx] = make(map[uint8]*player)
+			}
+			if nil == world.players[currTickIdx][clientID] {
+				world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
+			}
+			// update sequence ID
+			world.players[currTickIdx][clientID].sequenceNumber = seq
+
+			world.mux.Unlock()
+
 		}
-		world.mux.Unlock()
+
 	}
 }
 

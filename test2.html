@@ -1,0 +1,226 @@
+<html>
+
+<head>
+
+  <style>
+  canvas {
+      border: 3px solid #333;
+  }
+  </style>
+
+<script type = "text/javascript">
+
+    ws_open = false;
+ 
+          if ("WebSocket" in window) {
+ 
+             // Let us open a web socket
+             var ws = new WebSocket("ws://127.0.0.1:8080/");
+
+            ws.onmessage = function(evt) {
+                console.log(evt);
+            };
+             ws.onopen = function() {
+               ws_open = true;
+             };
+             ws.onclose = function() {
+               ws_open = false;
+             };
+          } else {
+             // The browser doesn't support WebSocket
+             alert("WebSocket NOT supported by your Browser!");
+          }
+    </script>
+
+</head>
+
+<body>
+    <canvas id='screen' width='300' height='300'></canvas>
+
+
+<script>
+var KEY = {
+    BACKSPACE: 8,
+    TAB:       9,
+    RETURN:   13,
+    ESC:      27,
+    SPACE:    32,
+    PAGEUP:   33,
+    PAGEDOWN: 34,
+    END:      35,
+    HOME:     36,
+    LEFT:     37,
+    UP:       38,
+    RIGHT:    39,
+    DOWN:     40,
+    INSERT:   45,
+    DELETE:   46,
+    ZERO:     48, ONE: 49, TWO: 50, THREE: 51, FOUR: 52, FIVE: 53, SIX: 54, SEVEN: 55, EIGHT: 56, NINE: 57,
+    A:        65, B: 66, C: 67, D: 68, E: 69, F: 70, G: 71, H: 72, I: 73, J: 74, K: 75, L: 76, M: 77, N: 78, O: 79, P: 80, Q: 81, R: 82, S: 83, T: 84, U: 85, V: 86, W: 87, X: 88, Y: 89, Z: 90,
+    TILDA:    192
+};
+
+var INPUT = {
+    LEFT: 0,
+    RIGHT: 1,
+    JUMP: 2
+};
+
+var WORLD_CONST = {
+    CLIENT_TICK_RATE: 60,
+    PLAYER_SPEED: 4 * 60
+}
+
+var player = {
+    position: { x: 0, y: 0},
+    velocity: { x: 0, y: 0}
+};
+
+var input = [false, false, false];
+
+var snapshot = {
+    seq: 255,
+    input: new Array(25),
+    position: new Array(25)
+};
+
+document.addEventListener('keydown', function(ev) { return onkey(ev, ev.keyCode, true);  }, false);
+document.addEventListener('keyup',   function(ev) { return onkey(ev, ev.keyCode, false); }, false);
+
+function onkey(ev, key, pressed) {
+  switch(key) {
+    case KEY.LEFT:  input[INPUT.LEFT] = pressed; ev.preventDefault(); break;
+    case KEY.RIGHT: input[INPUT.RIGHT] = pressed; ev.preventDefault(); break;
+    case KEY.SPACE: input[INPUT.JUMP]  = pressed; ev.preventDefault(); break;
+  }
+}
+
+function timestamp() {
+  return window.performance && window.performance.now ? window.performance.now() : new Date().getTime();
+};
+
+function clone(obj) {
+    if (null == obj || "object" != typeof obj) return obj;
+    var copy = obj.constructor();
+    for (var attr in obj) {
+        if (obj.hasOwnProperty(attr)) copy[attr] = obj[attr];
+    }
+    return copy;
+};
+
+
+function update(dt){
+
+    if(ws_open){
+
+        numActiveInpus = input.filter(Boolean).length;
+
+        if(numActiveInpus > 0){
+            // Num true inputs and 32bit unsigned int for seq number.
+            buffer = new ArrayBuffer(numActiveInpus + 8);
+
+            packageType = new Uint32Array(buffer, 0, 1);
+            packageType[0] = 1;
+
+            // Add current sequenct number.
+            seqslot = new Uint32Array(buffer, 4, 1);
+            seqslot[0] = snapshot.seq;
+
+            // Add inputs as 8 bit uint
+            j = 0;
+            for(i = 0; i < input.length; i++){
+                if(input[i]){
+                    inputslot = new Uint8Array(buffer, 8 + j, 1);
+                    inputslot[0] = i; 
+                    j++;
+                }
+            }
+
+            ws.send(buffer);
+
+            // Save inputs to local buffer
+            snapshot.input[snapshot.seq % 25] = clone(input);
+
+            // Update Physics
+            if(input[INPUT.LEFT]){
+                player.velocity.x = -WORLD_CONST.PLAYER_SPEED;
+            }else if(input[INPUT.RIGHT]){
+                player.velocity.x = +WORLD_CONST.PLAYER_SPEED;
+            }
+
+            player.position.x += Math.round(player.velocity.x * dt);
+            player.velocity.x = 0;
+
+            console.log("Seq: " + snapshot.seq + " -> " + input);
+
+            // Save player position in local buffer
+            snapshot.position[snapshot.seq % 25] = clone(player.position);
+
+            snapshot.seq++;
+
+            invalid = true;
+
+
+        }
+    }
+
+};
+
+var canvas = document.getElementById('screen'),
+    ctx    = canvas.getContext('2d'),
+    invalid = true,   // component requires redrawing ?
+    cache   = null;   // cached off-screen canvas
+
+var now, 
+    dt = 0, 
+    last = timestamp(), 
+    step = 1/60;
+
+function renderToCanvas(width, height, render, canvas) {
+    canvas = canvas || createCanvas(width, height, canvas);
+    render(canvas.getContext('2d'));
+    return canvas;
+}
+
+function createCanvas(width, height) {
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+}
+
+
+function render(ctx){
+  if (invalid) {
+    cache = renderToCanvas(600, 300, renderForReal, cache);
+    invalid = false;
+  }
+  ctx.drawImage(cache, 0, 0);
+}
+
+function renderForReal(ctx) {
+  ctx.fillStyle   = '#FF0000';
+  ctx.strokeStyle = '#00FF00';
+  ctx.clearRect(0, 0, 600, 300);
+  ctx.beginPath();
+  ctx.fillRect(player.position.x, 300 - 10 - 25, 25, 25);
+  ctx.strokeRect(player.position.x, 300 - 10 - 25, 25, 25);
+}
+
+function frame() {
+  now = timestamp();
+  dt = dt + Math.min(1, (now - last) / 1000);
+  while(dt > step) {
+    dt = dt - step;
+    update(step);
+  }
+  render(ctx);
+  last = now;
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

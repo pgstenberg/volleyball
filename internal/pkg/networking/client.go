@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -31,7 +30,7 @@ type Client struct {
 	// The websocket connection.
 	Conn *websocket.Conn
 
-	ID uuid.UUID
+	ID uint8
 }
 
 func (c *Client) Read(ch chan<- []byte) {
@@ -52,7 +51,7 @@ func (c *Client) Read(ch chan<- []byte) {
 			break
 		}
 
-		ch <- append(c.ID.Bytes(), message...)
+		ch <- append([]byte{byte(uint8(c.ID))}, message...)
 	}
 }
 

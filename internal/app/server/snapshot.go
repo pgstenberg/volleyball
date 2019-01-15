@@ -1,17 +1,13 @@
 package server
 
-import (
-	uuid "github.com/satori/go.uuid"
-)
-
 type snapshot struct {
-	Players map[uuid.UUID]*player
-	//LastSequenceNumber map[uuid.UUID]uint32
+	Players map[int]*player
 }
 
+/*
 func copySnapshot(snapshot1 *snapshot) *snapshot {
 	newSnapshot := snapshot{
-		Players: make(map[uuid.UUID]*player, len(snapshot1.Players)),
+		Players: make(map[int]*player, len(snapshot1.Players)),
 	}
 	for index, element := range snapshot1.Players {
 		newSnapshot.Players[index] = element.copy()
@@ -22,7 +18,7 @@ func copySnapshot(snapshot1 *snapshot) *snapshot {
 func diffSnapshot(snapshot0 *snapshot, snapshot1 *snapshot) *snapshot {
 
 	dSnapshot := snapshot{
-		Players: make(map[uuid.UUID]*player),
+		Players: make(map[int]*player),
 	}
 
 	for id, p := range snapshot1.Players {
@@ -33,3 +29,4 @@ func diffSnapshot(snapshot0 *snapshot, snapshot1 *snapshot) *snapshot {
 
 	return &dSnapshot
 }
+*/

@@ -26,6 +26,10 @@ func NewHub(broadcast chan []byte) *Hub {
 	}
 }
 
+func (h *Hub) CalcClientID() uint8 {
+	return uint8(len(h.clients))
+}
+
 func (h *Hub) Start() {
 	for {
 		select {

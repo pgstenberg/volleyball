@@ -2,20 +2,17 @@ package server
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/pgstenberg/volleyball/internal/pkg/networking"
-	uuid "github.com/satori/go.uuid"
 )
 
 type GameServer struct {
 	Bind string
-
-	tick     int
-	tickRate time.Duration
 }
 
 const ServerTickRate int = 20
@@ -64,23 +61,28 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		Hub:  hub,
 		Conn: conn,
 		Send: make(chan []byte, 256),
-		ID:   uuid.Must(uuid.NewV4())}
+		ID:   hub.CalcClientID()}
 
-	world.snapshot.Players[client.ID] = &player{
-		PosX:               0,
-		PosY:               0,
-		velX:               0,
-		velY:               0,
-		LastSequenceNumber: 0,
-		state:              make([]bool, 3),
-		jumpInputs:         0,
+	fmt.Printf("ClientID: %d", client.ID)
+
+	if nil == world.players[uint8(world.tick%stateBufferSize)] {
+		world.players[uint8(world.tick%stateBufferSize)] = make(map[uint8]*player)
 	}
+
+	world.players[uint8(world.tick%stateBufferSize)][client.ID] = &player{
+		sequenceNumber: 0,
+	}
+
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionX = uint16(0)
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionY = uint16(0)
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].velocityX = float64(0)
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].velocityY = float64(0)
 
 	client.Hub.Register <- client
 
 	go client.Read(world.NetworkInputChannel)
 	go client.Write()
 
-	client.Send <- []byte(client.ID.String())
+	//client.Send <- []byte(client.ID.String())
 
 }
