@@ -3,12 +3,11 @@ package server
 import (
 	"fmt"
 	"math"
-	"time"
 )
 
 type player struct {
-	positionX      uint16
-	positionY      uint16
+	positionX      int
+	positionY      int
 	velocityX      float64
 	velocityY      float64
 	sequenceNumber uint32
@@ -22,18 +21,22 @@ const stateMovingRight int = 1
 const stateJumping int = 2
 
 const playerSpeed float64 = 4 * float64(ServerTickRate)
-const gravity float64 = 4 * float64(ServerTickRate)
-const jumpSpeed = gravity * 3
+const gravity float64 = 4 * float64(20)
+const jumpSpeed float64 = 4 * 3 * float64(20)
 const maxJumpHight = 150
 
-func (p *player) getConsecutiveInputs(numSequences uint32, world *GameWorld, clientID uint8) [][]bool {
+func (p *player) getLastConsecutiveInputs(numSequences uint32, world *GameWorld, clientID uint8) [][]bool {
+	return p.getConsecutiveInputs(p.sequenceNumber, numSequences, world, clientID)
+}
+
+func (p *player) getConsecutiveInputs(startSequenceNumber uint32, numSequences uint32, world *GameWorld, clientID uint8) [][]bool {
 	input := make([][]bool, 0)
 	foundInLastTick := true
 
 	t := world.tick
-	s := p.sequenceNumber
+	s := startSequenceNumber
 
-	for s >= (p.sequenceNumber-(numSequences-1)) && s >= 0 && t > 0 {
+	for s >= (startSequenceNumber-numSequences) && s >= 0 && t > 0 {
 		bInput := world.stateBuffer[uint8(t%stateBufferSize)][clientID][s]
 
 		if len(bInput) == 0 {
@@ -56,7 +59,7 @@ func (p *player) getConsecutiveInputs(numSequences uint32, world *GameWorld, cli
 	return input
 }
 
-func (p *player) process(world *GameWorld, clientID uint8, input []bool) {
+func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenceNumber uint32, delta float64, numInputs int) {
 
 	//fmt.Printf("Input: %s\n", input)
 
@@ -66,23 +69,76 @@ func (p *player) process(world *GameWorld, clientID uint8, input []bool) {
 		p.velocityX += playerSpeed
 	}
 
-	start := time.Now()
-	l0 := p.getConsecutiveInputs(12, world, clientID)
+	if input[stateJumping] {
+		/*
+			validJump := true
+			linputs := p.getConsecutiveInputs(sequenceNumber, 5, world, clientID)
 
-	fmt.Printf("(%d) LAST INPUTS [%d]: %s\n", time.Since(start), len(l0), l0)
+			if len(linputs) == 5 {
+				for _, i := range linputs {
+					validJump = !i[stateJumping]
+				}
+			}
 
-	//JUMPING
+			fmt.Printf("> Seq: %d Inputs [%d] <<%s>>: %s\n", sequenceNumber, len(linputs), strconv.FormatBool(validJump), linputs)
+
+			if validJump {
+				p.velocityY += jumpSpeed
+			}
+		*/
+
+		if p.positionY == 0 {
+			p.velocityY += jumpSpeed
+		}
+	}
+
+	if p.velocityY > 0 || p.positionY > 0 {
+		p.velocityY -= gravity
+	}
+
+	d := delta / float64(numInputs)
+
+	dx := int(math.Round(p.velocityX * d))
+	dy := int(math.Round(p.velocityY * d))
+
+	p.positionX = p.positionX + dx
+	p.velocityX = 0
+
+	if p.positionY+dy < 0 {
+		p.positionY = 0
+		p.velocityY = 0
+	} else {
+		p.positionY = p.positionY + dy
+	}
+
+	fmt.Printf("Seq: %d, X: %d, Y: %d, VelX: %d, VelY: %d\n", sequenceNumber, p.positionX, p.positionY, p.velocityX, p.velocityY)
+
 }
 
+/*
 func (p *player) update(delta float64) {
 
-	//fmt.Printf("X: %d\n", p.positionX)
+	if p.velocityY > 0 || p.positionY > 0 {
+		p.velocityY -= gravity
+	}
 
-	p.positionX = p.positionX + uint16(math.Round(p.velocityX*delta))
-	p.positionY = p.positionY + uint16(math.Round(p.velocityY*delta))
+	dx := int(math.Round(p.velocityX * delta))
+	dy := int(math.Round(p.velocityY * delta))
 
+	p.positionX = p.positionX + dx
 	p.velocityX = 0
+
+	if p.positionY+dy < 0 {
+		p.positionY = 0
+		p.velocityY = 0
+	} else {
+		p.positionY = p.positionY + dy
+	}
+
+	fmt.Printf("Seq: %d, X: %d, Y: %d, VelX: %d, VelY: %d\n", p.sequenceNumber, p.positionX, p.positionY, p.velocityX, p.velocityY)
+
 }
+*/
 
 func (p *player) copy() *player {
 	clone := *p

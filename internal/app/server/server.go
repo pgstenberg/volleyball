@@ -73,8 +73,8 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		sequenceNumber: 0,
 	}
 
-	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionX = uint16(0)
-	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionY = uint16(0)
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionX = int(0)
+	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionY = int(0)
 	world.players[uint8(world.tick%stateBufferSize)][client.ID].velocityX = float64(0)
 	world.players[uint8(world.tick%stateBufferSize)][client.ID].velocityY = float64(0)
 

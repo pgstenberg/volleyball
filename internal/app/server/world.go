@@ -41,11 +41,10 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	for id, p := range world.players[currTickIdx] {
 		fmt.Printf("UPDATE >>>>>> %d\n", world.tick)
+		numInputs := len(world.stateBuffer[currTickIdx][id])
 		for tid, i := range world.stateBuffer[currTickIdx][id] {
-			fmt.Printf("Seq: %d -> %s\n", tid, i)
-			p.process(world, id, i)
+			p.process(world, id, i, tid, delta, numInputs)
 		}
-		p.update(delta)
 		fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
 		world.players[nextTickIdx][id] = p.copy()
 		world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
@@ -111,9 +110,6 @@ func (world *GameWorld) startNetworkLoop() {
 				}
 			*/
 			// Update next server tick with inputs and last sequence number.
-			fmt.Printf("NETWORK >>>>>> %d\n", world.tick)
-			fmt.Printf("Seq: %d -> %s\n", seq, inputs)
-			fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
 
 			world.stateBuffer[currTickIdx][clientID][seq] = inputs
 

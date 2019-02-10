@@ -68,7 +68,9 @@ var INPUT = {
 
 var WORLD_CONST = {
     CLIENT_TICK_RATE: 60,
-    PLAYER_SPEED: 4 * 60
+    PLAYER_SPEED: 4 * 60,
+    GRAVITY: 4 * 60,
+    JUMP_SPEED: 4 * 3 * 60
 }
 
 var player = {
@@ -138,9 +140,6 @@ function update(dt){
 
             ws.send(buffer);
 
-            // Save inputs to local buffer
-            snapshot.input[snapshot.seq % 25] = clone(input);
-
             // Update Physics
             if(input[INPUT.LEFT]){
                 player.velocity.x = -WORLD_CONST.PLAYER_SPEED;
@@ -148,20 +147,59 @@ function update(dt){
                 player.velocity.x = +WORLD_CONST.PLAYER_SPEED;
             }
 
-            player.position.x += Math.round(player.velocity.x * dt);
-            player.velocity.x = 0;
+            if(input[INPUT.JUMP]){
+              /*
+                validJump = true
+                for(i = snapshot.seq - 1; i >= snapshot.seq - 5; i--){
 
-            console.log("Seq: " + snapshot.seq + " -> " + input);
+                    //console.log(i + " - INPUT: " + snapshot.input[i % 25]);
+                    if(snapshot.input[i % 25] === undefined){
+                        validJump = true;
+                        break;
+                    }
+                    validJump = !snapshot.input[i % 25][INPUT.JUMP];
+                }
+                //if (player.velocity.y > 0 || player.position.y == 0) {
+                if(validJump){
+                    console.log("----------------------- JUMP!");
+                    player.velocity.y += WORLD_CONST.JUMP_SPEED;
+                }
+                */
 
-            // Save player position in local buffer
-            snapshot.position[snapshot.seq % 25] = clone(player.position);
-
-            snapshot.seq++;
-
-            invalid = true;
-
-
+                if(player.position.y === 0){
+                  player.velocity.y += WORLD_CONST.JUMP_SPEED;
+                }
+            }
         }
+
+        if(player.velocity.y > 0 || player.position.y > 0){
+                player.velocity.y -= WORLD_CONST.GRAVITY;
+        }
+
+
+        dx = Math.round(player.velocity.x * dt);
+        dy = Math.round(player.velocity.y * dt);
+
+        player.position.x += dx;
+        player.velocity.x = 0;
+
+        if(player.position.y + dy < 0){
+            player.position.y = 0;
+            player.velocity.y = 0;
+        }else{
+            player.position.y += dy;
+        }
+
+        console.log("Seq: " + snapshot.seq + " -> X: " + player.position.x + ", Y: " + player.position.y + ", VelY: " + player.velocity.y);
+
+        // Save inputs to local buffer
+        snapshot.input[snapshot.seq % 25] = clone(input);
+        // Save player position in local buffer
+        snapshot.position[snapshot.seq % 25] = clone(player.position);
+
+        snapshot.seq++;
+
+        invalid = true;
     }
 
 };
@@ -203,8 +241,8 @@ function renderForReal(ctx) {
   ctx.strokeStyle = '#00FF00';
   ctx.clearRect(0, 0, 600, 300);
   ctx.beginPath();
-  ctx.fillRect(player.position.x, 300 - 10 - 25, 25, 25);
-  ctx.strokeRect(player.position.x, 300 - 10 - 25, 25, 25);
+  ctx.fillRect(player.position.x, 300 - player.position.y - 25, 25, 25);
+  ctx.strokeRect(player.position.x, 300 - player.position.y - 25, 25, 25);
 }
 
 function frame() {
@@ -214,7 +252,7 @@ function frame() {
     dt = dt - step;
     update(step);
   }
-  render(ctx);
+  renderForReal(ctx);
   last = now;
   requestAnimationFrame(frame);
 }
