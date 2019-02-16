@@ -15,9 +15,9 @@ type GameWorld struct {
 	NetworkInputChannel  chan []byte
 	NetworkOutputChannel chan []byte
 	mux                  sync.Mutex
-	// State based on server tick.
+	// State based on server tick. [TICK][PLAYERID]
 	players map[uint8]map[uint8]*player
-	// Server tick and input buffer.
+	// Server tick and input buffer. [TICK][PLAYERID][INPUTS]
 	stateBuffer map[uint8]map[uint8]map[uint32][]bool
 }
 
@@ -87,6 +87,7 @@ func (world *GameWorld) startNetworkLoop() {
 		prevTickIdx := uint8((world.tick - 1) % stateBufferSize)
 
 		switch packageType {
+		// Client Inputs
 		case 1:
 
 			seq := binary.LittleEndian.Uint32(data[5:9])
@@ -126,6 +127,9 @@ func (world *GameWorld) startNetworkLoop() {
 			world.players[currTickIdx][clientID].sequenceNumber = seq
 
 			world.mux.Unlock()
+
+		// Client Tick Synchronize Request
+		case 0:
 
 		}
 

@@ -47,6 +47,13 @@ func (h *Hub) Start() {
 				close(client.Send)
 			}
 		case message := <-h.broadcast:
+			tClients := []uint8{}
+			// Checking what client are ment for this message.
+			// First byte is number of clients, then client IDs
+			for c := 1; c < int(uint8(message[0]))+1; c++ {
+				tClients = append(tClients, uint8(message[c]))
+			}
+
 			for client := range h.clients {
 				select {
 				case client.Send <- message:
