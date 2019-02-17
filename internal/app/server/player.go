@@ -3,14 +3,16 @@ package server
 import (
 	"fmt"
 	"math"
+	"strconv"
 )
 
 type player struct {
-	positionX      int
-	positionY      int
-	velocityX      float64
-	velocityY      float64
-	sequenceNumber uint32
+	positionX                   int
+	positionY                   int
+	velocityX                   float64
+	velocityY                   float64
+	lastReceivedSequenceNumber  uint32
+	lastProcessedSequenceNumber uint32
 }
 
 /*
@@ -20,13 +22,17 @@ const stateMovingLeft int = 0
 const stateMovingRight int = 1
 const stateJumping int = 2
 
-const playerSpeed float64 = 4 * float64(ServerTickRate)
+const playerSpeed float64 = 4 * float64(60)
 const gravity float64 = 4 * float64(20)
 const jumpSpeed float64 = 4 * 3 * float64(20)
 const maxJumpHight = 150
 
+func emptyInputs() []bool {
+	return []bool{false, false, false}
+}
+
 func (p *player) getLastConsecutiveInputs(numSequences uint32, world *GameWorld, clientID uint8) [][]bool {
-	return p.getConsecutiveInputs(p.sequenceNumber, numSequences, world, clientID)
+	return p.getConsecutiveInputs(p.lastProcessedSequenceNumber, numSequences, world, clientID)
 }
 
 func (p *player) getConsecutiveInputs(startSequenceNumber uint32, numSequences uint32, world *GameWorld, clientID uint8) [][]bool {
@@ -59,7 +65,7 @@ func (p *player) getConsecutiveInputs(startSequenceNumber uint32, numSequences u
 	return input
 }
 
-func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenceNumber uint32, delta float64, numInputs int) {
+func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenceNumber uint32, delta float64) {
 
 	//fmt.Printf("Input: %s\n", input)
 
@@ -70,22 +76,21 @@ func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenc
 	}
 
 	if input[stateJumping] {
-		/*
-			validJump := true
-			linputs := p.getConsecutiveInputs(sequenceNumber, 5, world, clientID)
 
-			if len(linputs) == 5 {
-				for _, i := range linputs {
-					validJump = !i[stateJumping]
-				}
+		validJump := true
+		linputs := p.getConsecutiveInputs(sequenceNumber, 5, world, clientID)
+
+		if len(linputs) == 5 {
+			for _, i := range linputs {
+				validJump = !i[stateJumping]
 			}
+		}
 
-			fmt.Printf("> Seq: %d Inputs [%d] <<%s>>: %s\n", sequenceNumber, len(linputs), strconv.FormatBool(validJump), linputs)
+		fmt.Printf("> Seq: %d Inputs [%d] <<%s>>: %s\n", sequenceNumber, len(linputs), strconv.FormatBool(validJump), linputs)
 
-			if validJump {
-				p.velocityY += jumpSpeed
-			}
-		*/
+		if validJump {
+			p.velocityY += jumpSpeed
+		}
 
 		if p.positionY == 0 {
 			p.velocityY += jumpSpeed
@@ -96,10 +101,8 @@ func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenc
 		p.velocityY -= gravity
 	}
 
-	d := delta / float64(numInputs)
-
-	dx := int(math.Round(p.velocityX * d))
-	dy := int(math.Round(p.velocityY * d))
+	dx := int(math.Round(p.velocityX * delta))
+	dy := int(math.Round(p.velocityY * delta))
 
 	p.positionX = p.positionX + dx
 	p.velocityX = 0

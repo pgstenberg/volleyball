@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -17,7 +18,7 @@ type GameWorld struct {
 	mux                  sync.Mutex
 	// State based on server tick. [TICK][PLAYERID]
 	players map[uint8]map[uint8]*player
-	// Server tick and input buffer. [TICK][PLAYERID][INPUTS]
+	// Server tick and input buffer. [TICK][PLAYERID][SEQID][INPUTS]
 	stateBuffer map[uint8]map[uint8]map[uint32][]bool
 }
 
@@ -36,18 +37,48 @@ func worldUpdate(world *GameWorld, delta float64) {
 	currTickIdx := uint8(world.tick % stateBufferSize)
 	nextTickIdx := uint8((world.tick + 1) % stateBufferSize)
 
-	world.players[nextTickIdx] = make(map[uint8]*player)
-	world.stateBuffer[nextTickIdx] = make(map[uint8]map[uint32][]bool)
+	if nil == world.players[nextTickIdx] {
+		world.players[nextTickIdx] = make(map[uint8]*player)
+	}
+	if nil == world.stateBuffer[nextTickIdx] {
+		world.stateBuffer[nextTickIdx] = make(map[uint8]map[uint32][]bool)
+	}
 
 	for id, p := range world.players[currTickIdx] {
 		fmt.Printf("UPDATE >>>>>> %d\n", world.tick)
-		numInputs := len(world.stateBuffer[currTickIdx][id])
-		for tid, i := range world.stateBuffer[currTickIdx][id] {
-			p.process(world, id, i, tid, delta, numInputs)
+
+		d := delta / 3
+
+		if nil == world.stateBuffer[currTickIdx][id] {
+			world.stateBuffer[currTickIdx][id] = make(map[uint32][]bool)
 		}
+
+		for seq := p.lastProcessedSequenceNumber + 1; seq <= p.lastProcessedSequenceNumber+3; seq++ {
+			if nil == world.stateBuffer[currTickIdx][id][seq] && len(world.stateBuffer[currTickIdx][id]) < 3 {
+				fmt.Printf("## FILL: %d\n", seq)
+				world.stateBuffer[currTickIdx][id][seq] = emptyInputs()
+			}
+		}
+
+		var keys []int
+		for k := range world.stateBuffer[currTickIdx][id] {
+			keys = append(keys, int(k))
+		}
+		sort.Ints(keys)
+
+		for _, k := range keys {
+			p.process(world, id, world.stateBuffer[currTickIdx][id][uint32(k)], uint32(k), d)
+			p.lastProcessedSequenceNumber = uint32(k)
+		}
+
 		fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
-		world.players[nextTickIdx][id] = p.copy()
-		world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
+
+		if nil == world.players[nextTickIdx][id] {
+			world.players[nextTickIdx][id] = p.copy()
+		}
+		if nil == world.stateBuffer[nextTickIdx][id] {
+			world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
+		}
 	}
 	world.tick++
 
@@ -84,7 +115,6 @@ func (world *GameWorld) startNetworkLoop() {
 		packageType := uint8(data[1])
 
 		currTickIdx := uint8(world.tick % stateBufferSize)
-		prevTickIdx := uint8((world.tick - 1) % stateBufferSize)
 
 		switch packageType {
 		// Client Inputs
@@ -102,29 +132,31 @@ func (world *GameWorld) startNetworkLoop() {
 			//
 			// Input Buffer
 			//
-			/*
+
+			// Update next server tick with inputs and last sequence number.
+
+			if len(world.stateBuffer[currTickIdx][clientID]) > 3 {
+				prevTickIdx := currTickIdx
+				currTickIdx := uint8((world.tick + 1) % stateBufferSize)
+
+				if nil == world.players[currTickIdx] {
+					world.players[currTickIdx] = make(map[uint8]*player)
+				}
 				if nil == world.stateBuffer[currTickIdx] {
 					world.stateBuffer[currTickIdx] = make(map[uint8]map[uint32][]bool)
+				}
+				if nil == world.players[currTickIdx][clientID] {
+					world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
 				}
 				if nil == world.stateBuffer[currTickIdx][clientID] {
 					world.stateBuffer[currTickIdx][clientID] = make(map[uint32][]bool)
 				}
-			*/
-			// Update next server tick with inputs and last sequence number.
+			}
 
 			world.stateBuffer[currTickIdx][clientID][seq] = inputs
 
-			//
-			// Player State
-			//
-			if nil == world.players[currTickIdx] {
-				world.players[currTickIdx] = make(map[uint8]*player)
-			}
-			if nil == world.players[currTickIdx][clientID] {
-				world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
-			}
 			// update sequence ID
-			world.players[currTickIdx][clientID].sequenceNumber = seq
+			world.players[currTickIdx][clientID].lastReceivedSequenceNumber = seq
 
 			world.mux.Unlock()
 
