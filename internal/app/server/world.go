@@ -60,15 +60,19 @@ func worldUpdate(world *GameWorld, delta float64) {
 			}
 		}
 
-		var keys []int
+		var keys []uint32
 		for k := range world.stateBuffer[currTickIdx][id] {
-			keys = append(keys, int(k))
+			keys = append(keys, k)
 		}
-		sort.Ints(keys)
+
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i] < keys[j]
+		})
 
 		for _, k := range keys {
-			p.process(world, id, world.stateBuffer[currTickIdx][id][uint32(k)], uint32(k), d)
-			p.lastProcessedSequenceNumber = uint32(k)
+			p.process(world, id, world.stateBuffer[currTickIdx][id][k], k, d)
+			p.lastProcessedSequenceNumber := *k
+			fmt.Printf("LastProcessedSequencNumber: %d\n", p.lastProcessedSequenceNumber)
 		}
 
 		fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
@@ -135,23 +139,28 @@ func (world *GameWorld) startNetworkLoop() {
 
 			// Update next server tick with inputs and last sequence number.
 
-			if len(world.stateBuffer[currTickIdx][clientID]) > 3 {
-				prevTickIdx := currTickIdx
-				currTickIdx := uint8((world.tick + 1) % stateBufferSize)
+			/*
+				fmt.Printf("-------- len: %d\n", len(world.stateBuffer[currTickIdx][clientID]))
 
-				if nil == world.players[currTickIdx] {
-					world.players[currTickIdx] = make(map[uint8]*player)
+				if len(world.stateBuffer[currTickIdx][clientID]) >= 3 {
+					fmt.Printf("## FIX!\n")
+					prevTickIdx := currTickIdx
+					currTickIdx := uint8((world.tick + 1) % stateBufferSize)
+
+					if nil == world.players[currTickIdx] {
+						world.players[currTickIdx] = make(map[uint8]*player)
+					}
+					if nil == world.stateBuffer[currTickIdx] {
+						world.stateBuffer[currTickIdx] = make(map[uint8]map[uint32][]bool)
+					}
+					if nil == world.players[currTickIdx][clientID] {
+						world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
+					}
+					if nil == world.stateBuffer[currTickIdx][clientID] {
+						world.stateBuffer[currTickIdx][clientID] = make(map[uint32][]bool)
+					}
 				}
-				if nil == world.stateBuffer[currTickIdx] {
-					world.stateBuffer[currTickIdx] = make(map[uint8]map[uint32][]bool)
-				}
-				if nil == world.players[currTickIdx][clientID] {
-					world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
-				}
-				if nil == world.stateBuffer[currTickIdx][clientID] {
-					world.stateBuffer[currTickIdx][clientID] = make(map[uint32][]bool)
-				}
-			}
+			*/
 
 			world.stateBuffer[currTickIdx][clientID][seq] = inputs
 
