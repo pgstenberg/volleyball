@@ -75,7 +75,10 @@ var WORLD_CONST = {
 
 var player = {
     position: { x: 0, y: 0},
-    velocity: { x: 0, y: 0}
+    velocity: { x: 0, y: 0},
+    onGround: true,
+    numJumpInputs: 0,
+    jumping: false
 };
 
 var input = [false, false, false];
@@ -117,6 +120,11 @@ function update(dt){
 
         numActiveInpus = input.filter(Boolean).length;
 
+        if(player.onGround && !input[INPUT.JUMP]){
+          player.numJumpInputs = 0;
+          player.jumping = false;
+        }
+
         if(numActiveInpus > 0){
             // Num true inputs and 32bit unsigned int for seq number.
             buffer = new ArrayBuffer(numActiveInpus + 8);
@@ -147,32 +155,15 @@ function update(dt){
                 player.velocity.x = +WORLD_CONST.PLAYER_SPEED;
             }
 
-            if(input[INPUT.JUMP]){
-              /*
-                validJump = true
-                for(i = snapshot.seq - 1; i >= snapshot.seq - 5; i--){
-
-                    //console.log(i + " - INPUT: " + snapshot.input[i % 25]);
-                    if(snapshot.input[i % 25] === undefined){
-                        validJump = true;
-                        break;
-                    }
-                    validJump = !snapshot.input[i % 25][INPUT.JUMP];
-                }
-                //if (player.velocity.y > 0 || player.position.y == 0) {
-                if(validJump){
-                    console.log("----------------------- JUMP!");
-                    player.velocity.y += WORLD_CONST.JUMP_SPEED;
-                }
-                */
-
-                if(player.position.y === 0){
-                  player.velocity.y += WORLD_CONST.JUMP_SPEED;
-                }
+            if(input[INPUT.JUMP] && (!player.jumping || player.numJumpInputs < 3)){
+                player.velocity.y += WORLD_CONST.JUMP_SPEED;
+                player.numJumpInputs += 1;
+                player.onGround = false;
+                player.jumping = true;
             }
         }
 
-        if(player.velocity.y > 0 || player.position.y > 0){
+        if(!player.onGround){
                 player.velocity.y -= WORLD_CONST.GRAVITY;
         }
 
@@ -186,6 +177,7 @@ function update(dt){
         if(player.position.y + dy < 0){
             player.position.y = 0;
             player.velocity.y = 0;
+            player.onGround = true;
         }else{
             player.position.y += dy;
         }

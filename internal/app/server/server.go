@@ -72,6 +72,9 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 	world.players[uint8(world.tick%stateBufferSize)][client.ID] = &player{
 		lastReceivedSequenceNumber:  0,
 		lastProcessedSequenceNumber: 0,
+		numJumpInputs:               0,
+		onGround:                    true,
+		jumping:                     false,
 	}
 
 	world.players[uint8(world.tick%stateBufferSize)][client.ID].positionX = int(0)
