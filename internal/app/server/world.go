@@ -71,7 +71,7 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 		for _, k := range keys {
 			p.process(world, id, world.stateBuffer[currTickIdx][id][k], k, d)
-			p.lastProcessedSequenceNumber = k
+			p.lastProcessedSequenceNumber = uint32(k)
 			fmt.Printf("LastProcessedSequencNumber: %d\n", p.lastProcessedSequenceNumber)
 		}
 
