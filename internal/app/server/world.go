@@ -90,7 +90,7 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	var b bytes.Buffer
 	for _, id := range returnData {
-		b.WriteString(fmt.Sprintf("%d,%d,%d,%d", id, world.players[currTickIdx][id].lastReceivedSequenceNumber, world.players[currTickIdx][id].positionX, world.players[currTickIdx][id].positionY))
+		b.WriteString(fmt.Sprintf("%d,%d,%d,%d", id, world.players[nextTickIdx][id].lastReceivedSequenceNumber, world.players[nextTickIdx][id].positionX, world.players[nextTickIdx][id].positionY))
 	}
 	if len(b.String()) > 0 {
 		world.NetworkOutputChannel <- []byte(b.String())

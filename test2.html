@@ -23,11 +23,9 @@
 
 
               if(evt.data.indexOf(",") === -1){
-                console.log("NEW ID: " + evt.data);
                 player_id = evt.data;
+                console.log("Joined as client id: " + player_id);
               }else{
-
-                console.log(evt.data);
                 darray = evt.data.split(",");
                 for(i = 0; i < darray.length; i+=4){
                   var d = []
@@ -35,26 +33,18 @@
                     d[j] = darray[i + j]
                   }
                   if(d[0] === player_id){
-                    console.log("ME!");
-                      //console.log(d[1]);
 
                       if(snapshot.position[d[1] % 25] === undefined){
                         break;
                       }
 
                       if(snapshot.position[d[1] % 25].x != d[2] || snapshot.position[d[1] % 25].y != d[3]){
-                        //console.log("MISSMATCH! X1:" + snapshot.position[d[1] % 25].x + " X2:" + d[2]);
-                        //console.log("MISSMATCH! Y1:" + snapshot.position[d[1] % 25].y + " Y2:" + d[3]);
-                        //player.position.x = d[2];
-                        //player.position.y = d[3];
+                        player.position.x = parseInt(d[2]);
+                        player.position.y = parseInt(d[3]);
                       }
                   }else{
 
-                    console.log("OTHER PLAYER!");
-
                     if(other_players[d[0]] === undefined){
-
-                      console.log("NEW PLAYER!");
                       other_players[d[0]] = {
                         position_x: parseInt(d[2]),
                         position_y: parseInt(d[3]),
@@ -62,7 +52,6 @@
                         target_y: parseInt(d[3])
                       }
                     }else{
-                      console.log("OTHER PLAYERS SETTING!");
                       other_players[d[0]].target_x = parseInt(d[2]);
                       other_players[d[0]].target_y = parseInt(d[3]);
                     }
