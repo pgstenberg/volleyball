@@ -75,6 +75,7 @@ func (c *Client) Write() {
 			if err != nil {
 				return
 			}
+
 			w.Write(message)
 
 			if err := w.Close(); err != nil {

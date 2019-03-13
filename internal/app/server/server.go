@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -63,7 +64,7 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 		Send: make(chan []byte, 256),
 		ID:   hub.CalcClientID()}
 
-	fmt.Printf("ClientID: %d", client.ID)
+	fmt.Printf("ClientID: %d\n", client.ID)
 
 	if nil == world.players[uint8(world.tick%stateBufferSize)] {
 		world.players[uint8(world.tick%stateBufferSize)] = make(map[uint8]*player)
@@ -87,6 +88,6 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 	go client.Read(world.NetworkInputChannel)
 	go client.Write()
 
-	//client.Send <- []byte(client.ID.String())
+	client.Send <- []byte(strconv.Itoa(int(client.ID)))
 
 }

@@ -16,9 +16,61 @@
  
              // Let us open a web socket
              var ws = new WebSocket("ws://127.0.0.1:8080/");
+             ws.binaryType = 'arraybuffer';
 
             ws.onmessage = function(evt) {
-                console.log(evt);
+
+
+
+              if(evt.data.indexOf(",") === -1){
+                console.log("NEW ID: " + evt.data);
+                player_id = evt.data;
+              }else{
+
+                console.log(evt.data);
+                darray = evt.data.split(",");
+                for(i = 0; i < darray.length; i+=4){
+                  var d = []
+                  for(j = 0; j < 4; j++){
+                    d[j] = darray[i + j]
+                  }
+                  if(d[0] === player_id){
+                    console.log("ME!");
+                      //console.log(d[1]);
+
+                      if(snapshot.position[d[1] % 25] === undefined){
+                        break;
+                      }
+
+                      if(snapshot.position[d[1] % 25].x != d[2] || snapshot.position[d[1] % 25].y != d[3]){
+                        //console.log("MISSMATCH! X1:" + snapshot.position[d[1] % 25].x + " X2:" + d[2]);
+                        //console.log("MISSMATCH! Y1:" + snapshot.position[d[1] % 25].y + " Y2:" + d[3]);
+                        //player.position.x = d[2];
+                        //player.position.y = d[3];
+                      }
+                  }else{
+
+                    console.log("OTHER PLAYER!");
+
+                    if(other_players[d[0]] === undefined){
+
+                      console.log("NEW PLAYER!");
+                      other_players[d[0]] = {
+                        position_x: parseInt(d[2]),
+                        position_y: parseInt(d[3]),
+                        target_x: parseInt(d[2]),
+                        target_y: parseInt(d[3])
+                      }
+                    }else{
+                      console.log("OTHER PLAYERS SETTING!");
+                      other_players[d[0]].target_x = parseInt(d[2]);
+                      other_players[d[0]].target_y = parseInt(d[3]);
+                    }
+                    
+                  }
+                }
+              }
+                
             };
              ws.onopen = function() {
                ws_open = true;
@@ -35,7 +87,7 @@
 </head>
 
 <body>
-    <canvas id='screen' width='300' height='300'></canvas>
+    <canvas id='screen' width='1024' height='300'></canvas>
 
 
 <script>
@@ -80,6 +132,10 @@ var player = {
     numJumpInputs: 0,
     jumping: false
 };
+
+var other_players = new Map();
+
+var player_id = null;
 
 var input = [false, false, false];
 
@@ -182,7 +238,7 @@ function update(dt){
             player.position.y += dy;
         }
 
-        console.log("Seq: " + snapshot.seq + " -> X: " + player.position.x + ", Y: " + player.position.y + ", VelY: " + player.velocity.y);
+        //console.log("Seq: " + snapshot.seq + " -> X: " + player.position.x + ", Y: " + player.position.y + ", VelY: " + player.velocity.y);
 
         // Save inputs to local buffer
         snapshot.input[snapshot.seq % 25] = clone(input);
@@ -190,6 +246,19 @@ function update(dt){
         snapshot.position[snapshot.seq % 25] = clone(player.position);
 
         snapshot.seq++;
+
+        for (var p in other_players) {
+          if(other_players[p].target_x > other_players[p].position_x){
+            other_players[p].position_x += Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+          }else if(other_players[p].target_x < other_players[p].position_x){
+            other_players[p].position_x -= Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+          }
+          if(other_players[p].target_y > other_players[p].position_y){
+            other_players[p].position_y += Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+          }else if(other_players[p].target_y < other_players[p].position_y){
+            other_players[p].position_y -= Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+          }
+        }
 
         invalid = true;
     }
@@ -222,7 +291,7 @@ function createCanvas(width, height) {
 
 function render(ctx){
   if (invalid) {
-    cache = renderToCanvas(600, 300, renderForReal, cache);
+    cache = renderToCanvas(1024, 300, renderForReal, cache);
     invalid = false;
   }
   ctx.drawImage(cache, 0, 0);
@@ -231,10 +300,16 @@ function render(ctx){
 function renderForReal(ctx) {
   ctx.fillStyle   = '#FF0000';
   ctx.strokeStyle = '#00FF00';
-  ctx.clearRect(0, 0, 600, 300);
+  ctx.clearRect(0, 0, 1024, 300);
   ctx.beginPath();
   ctx.fillRect(player.position.x, 300 - player.position.y - 25, 25, 25);
   ctx.strokeRect(player.position.x, 300 - player.position.y - 25, 25, 25);
+
+  ctx.fillStyle   = '#ff8484';
+  for (var p in other_players) {
+    ctx.fillRect(other_players[p].position_x, 300 - other_players[p].position_y - 25, 25, 25);
+    ctx.strokeRect(other_players[p].position_x, 300 - other_players[p].position_y - 25, 25, 25);
+  }
 }
 
 function frame() {

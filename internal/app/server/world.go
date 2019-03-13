@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"sort"
@@ -36,16 +37,14 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	currTickIdx := uint8(world.tick % stateBufferSize)
 	nextTickIdx := uint8((world.tick + 1) % stateBufferSize)
+	prevTickIdx := uint8((world.tick - 1) % stateBufferSize)
 
-	if nil == world.players[nextTickIdx] {
-		world.players[nextTickIdx] = make(map[uint8]*player)
-	}
-	if nil == world.stateBuffer[nextTickIdx] {
-		world.stateBuffer[nextTickIdx] = make(map[uint8]map[uint32][]bool)
-	}
+	returnData := []uint8{}
+
+	world.players[nextTickIdx] = make(map[uint8]*player)
+	world.stateBuffer[nextTickIdx] = make(map[uint8]map[uint32][]bool)
 
 	for id, p := range world.players[currTickIdx] {
-		fmt.Printf("UPDATE >>>>>> %d\n", world.tick)
 
 		d := delta / 3
 
@@ -53,13 +52,14 @@ func worldUpdate(world *GameWorld, delta float64) {
 			world.stateBuffer[currTickIdx][id] = make(map[uint32][]bool)
 		}
 
+		// Fill in empty sequenceNumbers from client
 		for seq := p.lastProcessedSequenceNumber + 1; seq <= p.lastProcessedSequenceNumber+3; seq++ {
 			if nil == world.stateBuffer[currTickIdx][id][seq] && len(world.stateBuffer[currTickIdx][id]) < 3 {
-				fmt.Printf("## FILL: %d\n", seq)
 				world.stateBuffer[currTickIdx][id][seq] = emptyInputs()
 			}
 		}
 
+		// Sort inputs and process them
 		var keys []uint32
 		for k := range world.stateBuffer[currTickIdx][id] {
 			keys = append(keys, k)
@@ -71,19 +71,31 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 		for _, k := range keys {
 			p.process(world, id, world.stateBuffer[currTickIdx][id][k], k, d)
-			p.lastProcessedSequenceNumber = uint32(k)
-			fmt.Printf("LastProcessedSequencNumber: %d\n", p.lastProcessedSequenceNumber)
+			if k > p.lastProcessedSequenceNumber {
+				p.lastProcessedSequenceNumber = uint32(k)
+			}
 		}
 
-		fmt.Printf("<<<<<<<<<<<<<<<<<<<< \n")
+		// Check if player state have changed, if that is the case send update to clients.
+		if nil != world.players[prevTickIdx][id] {
+			if world.players[prevTickIdx][id].positionX != p.positionX || world.players[prevTickIdx][id].positionY != p.positionY {
+				returnData = append(returnData, id)
+			}
+		}
 
-		if nil == world.players[nextTickIdx][id] {
-			world.players[nextTickIdx][id] = p.copy()
-		}
-		if nil == world.stateBuffer[nextTickIdx][id] {
-			world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
-		}
+		world.players[nextTickIdx][id] = p.copy()
+		world.stateBuffer[nextTickIdx][id] = make(map[uint32][]bool)
+
 	}
+
+	var b bytes.Buffer
+	for _, id := range returnData {
+		b.WriteString(fmt.Sprintf("%d,%d,%d,%d", id, world.players[currTickIdx][id].lastReceivedSequenceNumber, world.players[currTickIdx][id].positionX, world.players[currTickIdx][id].positionY))
+	}
+	if len(b.String()) > 0 {
+		world.NetworkOutputChannel <- []byte(b.String())
+	}
+
 	world.tick++
 
 	world.mux.Unlock()
@@ -132,35 +144,6 @@ func (world *GameWorld) startNetworkLoop() {
 				id := uint8(data[idx])
 				inputs[id] = true
 			}
-
-			//
-			// Input Buffer
-			//
-
-			// Update next server tick with inputs and last sequence number.
-
-			/*
-				fmt.Printf("-------- len: %d\n", len(world.stateBuffer[currTickIdx][clientID]))
-
-				if len(world.stateBuffer[currTickIdx][clientID]) >= 3 {
-					fmt.Printf("## FIX!\n")
-					prevTickIdx := currTickIdx
-					currTickIdx := uint8((world.tick + 1) % stateBufferSize)
-
-					if nil == world.players[currTickIdx] {
-						world.players[currTickIdx] = make(map[uint8]*player)
-					}
-					if nil == world.stateBuffer[currTickIdx] {
-						world.stateBuffer[currTickIdx] = make(map[uint8]map[uint32][]bool)
-					}
-					if nil == world.players[currTickIdx][clientID] {
-						world.players[currTickIdx][clientID] = world.players[prevTickIdx][clientID].copy()
-					}
-					if nil == world.stateBuffer[currTickIdx][clientID] {
-						world.stateBuffer[currTickIdx][clientID] = make(map[uint32][]bool)
-					}
-				}
-			*/
 
 			world.stateBuffer[currTickIdx][clientID][seq] = inputs
 

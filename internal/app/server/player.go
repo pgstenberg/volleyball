@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -34,8 +33,6 @@ func emptyInputs() []bool {
 }
 
 func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenceNumber uint32, delta float64) {
-
-	//fmt.Printf("Input: %s\n", input)
 
 	if p.onGround && !input[stateJumping] {
 		p.numJumpInputs = 0
@@ -72,8 +69,6 @@ func (p *player) process(world *GameWorld, clientID uint8, input []bool, sequenc
 	} else {
 		p.positionY = p.positionY + dy
 	}
-
-	fmt.Printf("Seq: %d, X: %d, Y: %d, VelX: %d, VelY: %d\n", sequenceNumber, p.positionX, p.positionY, p.velocityX, p.velocityY)
 
 }
 
