@@ -254,9 +254,9 @@ function update(dt){
             other_players[p].position_x -= Math.round(WORLD_CONST.PLAYER_SPEED * dt);
           }
           if(other_players[p].target_y > other_players[p].position_y){
-            other_players[p].position_y += Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+            other_players[p].position_y += Math.round(WORLD_CONST.JUMP_SPEED * dt);
           }else if(other_players[p].target_y < other_players[p].position_y){
-            other_players[p].position_y -= Math.round(WORLD_CONST.PLAYER_SPEED * dt);
+            other_players[p].position_y -= Math.round(WORLD_CONST.JUMP_SPEED * dt);
           }
         }
 
