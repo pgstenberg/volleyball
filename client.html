@@ -20,44 +20,55 @@
 
             ws.onmessage = function(evt) {
 
+              var dv = new DataView(evt.data);
 
-
-              if(evt.data.indexOf(",") === -1){
-                player_id = evt.data;
+              if(dv.byteLength == 1){
+                player_id = dv.getUint8(0, true);
                 console.log("Joined as client id: " + player_id);
-              }else{
-                darray = evt.data.split(",");
-                for(i = 0; i < darray.length; i+=4){
-                  var d = []
-                  for(j = 0; j < 4; j++){
-                    d[j] = darray[i + j]
+                return;
+              }
+
+              for(idx = 0; idx < (dv.byteLength/9); idx+=4){
+                playerID = dv.getUint8(0, true);
+                playerSeqNum = dv.getUint32(1, true);
+                playerX = dv.getUint32(5, true);
+                playerY = dv.getUint32(9, true);
+                
+                // Verify player state
+                if(playerID === player_id){
+                  // If no snapshot is found, just continue
+                  if(snapshot.position[playerSeqNum % 25] === undefined){
+                    continue;
                   }
-                  if(d[0] === player_id){
 
-                      if(snapshot.position[d[1] % 25] === undefined){
-                        break;
-                      }
 
-                      if(snapshot.position[d[1] % 25].x != d[2] || snapshot.position[d[1] % 25].y != d[3]){
-                        player.position.x = parseInt(d[2]);
-                        player.position.y = parseInt(d[3]);
-                      }
-                  }else{
+                  if(snapshot.position[playerSeqNum % 25].x != playerX || snapshot.position[playerSeqNum % 25].y != playerY){
+                    console.log("!!! Client out of sync; X0: " + snapshot.position[playerSeqNum % 25].x + " X1: " + playerX + " Y0: " + snapshot.position[playerSeqNum % 25].y + " Y1: " + playerY);
+                    player.position.x = parseInt(playerX);
+                    player.position.y = parseInt(playerY);
+                  }
+                
+                // Sync other players
+                }else{
 
-                    if(other_players[d[0]] === undefined){
-                      other_players[d[0]] = {
-                        position_x: parseInt(d[2]),
-                        position_y: parseInt(d[3]),
-                        target_x: parseInt(d[2]),
-                        target_y: parseInt(d[3])
-                      }
-                    }else{
-                      other_players[d[0]].target_x = parseInt(d[2]);
-                      other_players[d[0]].target_y = parseInt(d[3]);
+                  if(other_players[playerID] === undefined) {
+                    // Create player if such do not exist.
+                    other_players[playerID] = {
+                      // Where player actual are
+                      position_x: parseInt(playerX),
+                      position_y: parseInt(playerY),
+                      // Where player should be
+                      target_x: parseInt(playerX),
+                      target_y: parseInt(playerY)
                     }
-                    
+                  }else{
+                    // Just update target position
+                    other_players[playerID].target_x = parseInt(playerX);
+                    other_players[playerID].target_y = parseInt(playerY);
                   }
                 }
+
+
               }
                 
             };
@@ -227,8 +238,6 @@ function update(dt){
             player.position.y += dy;
         }
 
-        //console.log("Seq: " + snapshot.seq + " -> X: " + player.position.x + ", Y: " + player.position.y + ", VelY: " + player.velocity.y);
-
         // Save inputs to local buffer
         snapshot.input[snapshot.seq % 25] = clone(input);
         // Save player position in local buffer
@@ -236,6 +245,7 @@ function update(dt){
 
         snapshot.seq++;
 
+        // Interpolation on other players
         for (var p in other_players) {
           if(other_players[p].target_x > other_players[p].position_x){
             other_players[p].position_x += Math.round(WORLD_CONST.PLAYER_SPEED * dt);

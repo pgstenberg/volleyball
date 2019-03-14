@@ -1,9 +1,7 @@
 package server
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -88,12 +86,26 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	}
 
-	var b bytes.Buffer
+	breturn := []byte{}
 	for _, id := range returnData {
-		b.WriteString(fmt.Sprintf("%d,%d,%d,%d", id, world.players[nextTickIdx][id].lastReceivedSequenceNumber, world.players[nextTickIdx][id].positionX, world.players[nextTickIdx][id].positionY))
+
+		breturn = append(breturn, id)
+
+		a := make([]byte, 4)
+		binary.LittleEndian.PutUint32(a, world.players[nextTickIdx][id].lastReceivedSequenceNumber)
+		breturn = append(breturn, a...)
+
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, uint32(world.players[nextTickIdx][id].positionX))
+		breturn = append(breturn, b...)
+
+		c := make([]byte, 4)
+		binary.LittleEndian.PutUint32(c, uint32(world.players[nextTickIdx][id].positionY))
+		breturn = append(breturn, c...)
+
 	}
-	if len(b.String()) > 0 {
-		world.NetworkOutputChannel <- []byte(b.String())
+	if len(breturn) > 0 {
+		world.NetworkOutputChannel <- breturn
 	}
 
 	world.tick++
@@ -151,9 +163,6 @@ func (world *GameWorld) startNetworkLoop() {
 			world.players[currTickIdx][clientID].lastReceivedSequenceNumber = seq
 
 			world.mux.Unlock()
-
-		// Client Tick Synchronize Request
-		case 0:
 
 		}
 

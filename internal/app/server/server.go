@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -88,6 +87,6 @@ func ws(world *GameWorld, hub *networking.Hub, upgrader *websocket.Upgrader, w h
 	go client.Read(world.NetworkInputChannel)
 	go client.Write()
 
-	client.Send <- []byte(strconv.Itoa(int(client.ID)))
+	client.Send <- []byte{client.ID}
 
 }
