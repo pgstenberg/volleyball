@@ -14,8 +14,8 @@
  
           if ("WebSocket" in window) {
  
-             // Let us open a web socket
-             var ws = new WebSocket("ws://127.0.0.1:8080/");
+             // REPLACE WITH IP HERE!
+             var ws = new WebSocket("ws://192.168.12.92:8080/");
              ws.binaryType = 'arraybuffer';
 
             ws.onmessage = function(evt) {
@@ -82,12 +82,22 @@
              // The browser doesn't support WebSocket
              alert("WebSocket NOT supported by your Browser!");
           }
+
+
+
     </script>
 
 </head>
 
 <body>
     <canvas id='screen' width='1024' height='300'></canvas>
+    <div style='width: 1024px'>
+      <center>
+        <button id="leftButton" style='width: 300px; height: 50px; margin: 0px; padding: 0px;'>LEFT</button>
+        <button id="jumpButton" style='width: 400px; height: 50px; margin: 0px; padding: 0px;'>JUMP</button>
+        <button id="rightButton" style='width: 300px; height: 50px; margin: 0px; padding: 0px;'>RIGHT</button>
+      </center>
+    </div>
 
 
 <script>
@@ -123,7 +133,10 @@ var WORLD_CONST = {
     PLAYER_SPEED: 4 * 60,
     GRAVITY: 4 * 60,
     JUMP_SPEED: 4 * 3 * 60
-}
+};
+
+
+
 
 var player = {
     position: { x: 0, y: 0},
@@ -147,6 +160,45 @@ var snapshot = {
 
 document.addEventListener('keydown', function(ev) { return onkey(ev, ev.keyCode, true);  }, false);
 document.addEventListener('keyup',   function(ev) { return onkey(ev, ev.keyCode, false); }, false);
+
+
+document.getElementById("leftButton").addEventListener("mousedown", function(event) {
+  input[INPUT.LEFT] = true;
+}, false);
+document.getElementById("leftButton").addEventListener("mouseup", function(event) {
+  input[INPUT.LEFT] = false;
+}, false);
+document.getElementById("rightButton").addEventListener("mousedown", function(event) {
+  input[INPUT.RIGHT] = true;
+}, false);
+document.getElementById("rightButton").addEventListener("mouseup", function(event) {
+  input[INPUT.RIGHT] = false;
+}, false);
+document.getElementById("jumpButton").addEventListener("mousedown", function(event) {
+  input[INPUT.JUMP] = true;
+}, false);
+document.getElementById("jumpButton").addEventListener("mouseup", function(event) {
+  input[INPUT.JUMP] = false;
+}, false);
+
+document.getElementById("leftButton").ontouchstart = function(event) {
+  input[INPUT.LEFT] = true;
+};
+document.getElementById("leftButton").ontouchend = function(event) {
+  input[INPUT.LEFT] = false;
+};
+document.getElementById("rightButton").ontouchstart = function(event) {
+  input[INPUT.RIGHT] = true;
+};
+document.getElementById("rightButton").ontouchend = function(event) {
+  input[INPUT.RIGHT] = false;
+};
+document.getElementById("jumpButton").ontouchstart = function(event) {
+  input[INPUT.JUMP] = true;
+};
+document.getElementById("jumpButton").ontouchend = function(event) {
+  input[INPUT.JUMP] = false;
+};
 
 function onkey(ev, key, pressed) {
   switch(key) {
