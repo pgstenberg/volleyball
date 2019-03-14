@@ -86,6 +86,7 @@ func worldUpdate(world *GameWorld, delta float64) {
 
 	}
 
+	// Send updated state to clients.
 	breturn := []byte{}
 	for _, id := range returnData {
 
