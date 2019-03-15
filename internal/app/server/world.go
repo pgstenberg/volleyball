@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -104,8 +105,11 @@ func worldUpdate(world *GameWorld, delta float64) {
 		binary.LittleEndian.PutUint32(c, uint32(world.players[nextTickIdx][id].positionY))
 		breturn = append(breturn, c...)
 
+		fmt.Printf("PID: %d, SEQ: %d, X: %d, Y: %d\n", id, world.players[nextTickIdx][id].lastReceivedSequenceNumber, world.players[nextTickIdx][id].positionX, world.players[nextTickIdx][id].positionY)
+
 	}
 	if len(breturn) > 0 {
+		fmt.Printf("Sending %d bytes...\n", len(breturn))
 		world.NetworkOutputChannel <- breturn
 	}
 
